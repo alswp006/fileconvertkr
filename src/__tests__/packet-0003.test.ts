@@ -96,30 +96,33 @@ describe("변환 실행기 runJob·finishJob·deliverFile·useConversionRunner",
      * AC-7[P0] timeout case: 60000ms 이상 걸리면 timeout message
      */
     it("AC-7[P0]: should timeout at 60000ms and set timeout message", async () => {
+      vi.useFakeTimers();
+
       const { runJob } = await import("@/lib/runJob");
 
       const slowFile = new File(["data"], "slow.jpg", { type: "image/jpeg" });
       const inputs = [slowFile];
 
       const mockProcess = vi.fn(
-        async () =>
-          new Promise<ConversionOutput[]>((resolve) => {
-            // Simulate timeout by never resolving
-            setTimeout(() => resolve([]), 70000); // > 60000ms timeout
-          })
+        () => new Promise<ConversionOutput[]>(() => {}) // never resolves
       );
 
-      const result = await runJob(inputs, mockProcess, {
+      const resultPromise = runJob(inputs, mockProcess, {
         onProgress: () => {},
         timeoutMs: 60000,
         signal: undefined,
       });
+
+      await vi.advanceTimersByTimeAsync(60000);
+      const result = await resultPromise;
 
       // Should timeout and fail
       expect(result.failures).toHaveLength(1);
       expect(result.failures[0]?.message).toBe(
         "변환 시간이 너무 오래 걸려서 중단했어요"
       );
+
+      vi.useRealTimers();
     });
 
     /**
