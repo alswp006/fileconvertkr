@@ -30,6 +30,12 @@ if (typeof globalThis.requestAnimationFrame !== "function") {
   globalThis.cancelAnimationFrame = ((id: number) => clearTimeout(id)) as typeof globalThis.cancelAnimationFrame;
 }
 
+// ── URL.createObjectURL mock for image/file handling ──
+// jsdom doesn't implement URL.createObjectURL, needed for image dimension detection
+if (typeof URL.createObjectURL !== 'function') {
+  URL.createObjectURL = vi.fn((blob: Blob) => `blob:${Math.random()}`);
+}
+
 // ── afterEach reset ──
 afterEach(() => {
   vi.clearAllMocks();

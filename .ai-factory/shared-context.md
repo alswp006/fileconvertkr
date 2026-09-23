@@ -178,11 +178,15 @@ export type ResultRouteState = {
     TossPurchase.tsx
     TossRewardAd.tsx
   hooks/
+    useConversionRunner.ts
   lib/
     analytics.ts
     contract.ts
+    deliverFile.ts
+    finishJob.ts
     jobStore.ts
     review.ts
+    runJob.ts
     share.ts
     storage/
     storage.ts
@@ -210,8 +214,11 @@ export type ResultRouteState = {
 ### Exports (src/lib/)
 - analytics.ts: export type LogFields = Record<string, string | number | boolean | null>; export const DWELL_MS = 3000; export function fireAndForget(call: () => unknown): void; export function logScreen(page: string, extra?: LogFields): void; export function logClick(name: string, extra?: LogFields): void; export function logImpression(name: string, extra?: LogFields): void; export function useScreenLog(page: string): void
 - contract.ts: export type Job =; export type ConversionResult =; export type ToolType = 'heic-convert' | 'image-compress' | 'pdf-merge' | 'pdf-split' | 'pdf-to-image'; export type runJobFn = (job: Job, converters: Record<ToolType, (files: Blob[], opts: any) => Promise<Blob[]>>) => Promis; export type useConversionRunnerFn = () =>; export type historyRepoFn =; export type prefsStoreFn =; export type compressToTargetFn = (blob: Blob, targetKb: number, options?:
+- deliverFile.ts: export async function deliverFile(output: ConversionOutput): Promise<void>
+- finishJob.ts: export async function finishJob( job: ConversionJob, navigate: NavigateFunction ): Promise<void>
 - jobStore.ts: export const jobStore =
 - review.ts: export function requestReviewOnce(key: string = REVIEW_REQUESTED_KEY): void
+- runJob.ts: export async function runJob<T extends ConversionOutput>( inputs: File[], process: (file: File) => Promise<T[]>, opts:; export function buildJob( jobId: string, tool: ToolType, options: JobOptions, inputs: InputFileMeta[], outputs: Conversi; export function toHistoryEntry(job: ConversionJob): HistoryEntry
 - share.ts: export interface ShareAppOptions; export async function shareApp(opts: ShareAppOptions): Promise<void>
 - storage/historyRepo.ts: export type HistoryAppendInput = Pick<HistoryEntry, 'tool' | 'inputNames' | 'inputCount'> & Partial<Omit<HistoryEntry, '; export const historyRepo =
 - storage/prefs.ts: export const prefs =; export const prefsStore =
