@@ -160,7 +160,10 @@ export function mockTds() {
       { Header: ({ children }: any) => React.createElement("div", null, children) },
     ),
 
-    Chip: ({ children, selected, onClick }: any) =>
+    // 실제 @toss/tds-mobile은 Chip(그룹 컨테이너, div) + ChipItem(개별 선택 버튼)으로 분리돼
+    // 있다(.d.ts 검증) — 그 구조를 그대로 목킹해 mock과 실제 API 사이 계약 불일치를 막는다.
+    Chip: ({ children }: any) => React.createElement("div", { role: "group" }, children),
+    ChipItem: ({ children, selected, onClick }: any) =>
       React.createElement(
         "button",
         { role: "button", "aria-pressed": selected, onClick },
