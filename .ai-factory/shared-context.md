@@ -170,6 +170,7 @@ export type ResultRouteState = {
     CountUp.tsx
     FilePickSection.tsx
     FloatingTabBar.tsx
+    KeyboardAwareTextField.tsx
     MergeFileList.tsx
     MiniBar.tsx
     PageShell.tsx
@@ -179,6 +180,7 @@ export type ResultRouteState = {
     Sparkline.tsx
     StateView.tsx
     SummaryHero.tsx
+    TargetSizeSelector.tsx
     TossPurchase.tsx
     TossRewardAd.tsx
   hooks/
@@ -236,7 +238,7 @@ export type ResultRouteState = {
 - review.ts: export function requestReviewOnce(key: string = REVIEW_REQUESTED_KEY): void
 - runJob.ts: export async function runJob<T extends ConversionOutput>( inputs: File[], process: (file: File) => Promise<T[]>, opts:; export function buildJob( jobId: string, tool: ToolType, options: JobOptions, inputs: InputFileMeta[], outputs: Conversi; export function toHistoryEntry(job: ConversionJob): HistoryEntry
 - share.ts: export interface ShareAppOptions; export async function shareApp(opts: ShareAppOptions): Promise<void>
-- storage/historyRepo.ts: export type HistoryAppendInput = Pick<HistoryEntry, 'tool' | 'i...
+- storage/historyRepo.ts: expor...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
@@ -245,86 +247,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0005: 이미지 압축 엔진 encodeToTarget·compressToTarget (files: src/lib/convert/canvasEncode.ts, src/lib/convert/compress.ts, src/lib/convert/compress.test.ts)
 - 0006: PDF 엔진: 범위 파서·합치기·나누기·렌더러 (files: src/lib/pdf/pageRanges.ts, src/lib/pdf/merge.ts, src/lib/pdf/split.ts, src/lib/pdf/render.ts, src/lib/pdf/pageRanges.test.ts)
 - 0007: 파일 선택 컴포넌트: FilePickSection·SelectedFileList·MergeFileList·PdfSingleFilePicker (files: src/components/FilePickSection.tsx, src/components/SelectedFileList.tsx, src/components/MergeFileList.tsx, src/components/PdfSingleFilePicker.tsx, src/components/FilePickers.test.tsx)
-
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FilePickSection.tsx
-export interface FilePickSectionProps {
-export function FilePickSection({ tool, selected, onAdd, label, multiple, disabled }: FilePickSectionProps) {
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MergeFileList.tsx
-export interface MergeFileListProps {
-export function MergeFileList({ files, pageCounts, onRemove, onMoveUp, onMoveDown, disabled }: MergeFileListProps) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({
-
-// src/components/PdfSingleFilePicker.tsx
-export interface PdfSingleFilePickerProps {
-export function PdfSingleFilePicker({ tool, selected, onPicked, label, disabled }: PdfSingleFilePickerProps) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/SelectedFileList.tsx
-export interface SelectedFileListProps {
-export function SelectedFileList({ files, onRemove, disabled }: SelectedFileListProps) {
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/hooks/useConversionRunner.ts
-export function useConversionRunner() {
-
-// src/lib/analytics.ts
-export type LogFields = Rec
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(4), general(13), testing(2), ui(3)
-
-Key lessons (verify against actual code before applying):
-- [general] 파일 생성 전 디렉토리 구조 확인 — mkdir -p로 경로 보장 (60% · 타 앱 1회 — 맹신 금지)
-- [general] 화면·라우팅 등 소비자 모듈은 그것이 import하는 생산자 모듈이 병합된 뒤에만 병합하고, 순서를 지킬 수 없으면 소비자 병합과 동시에 최소 플레이스홀더를 만들어 매 병합 직후 타입체크와 빌드가 항상 통과하도록 유지하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 전역 라우팅·탭바·Provider 배선은 개별 화면보다 먼저(초반 20% 안에) 완료하고 미구현 화면은 스텁 라우트로 연결해, 시간 예산이 소진돼도 앱이 항상 실행 가능한 상태를 유지하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 저장·데이터 접근 등 기반 계층 패킷은 이를 import 하는 화면 패킷보다 반드시 먼저 완료·병합하고, 미완료면 상위 화면 패킷 병합을 차단하라 — 빈 기반 모듈 하나가 전 라우트 스모크를 무너뜨린다. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 외부에서 들어온 모든 값(라우터 state, 로컬 저장소, 부분 입력 폼)은 사용 직전에 배열·객체 기본값으로 정규화하고, 테이블/맵 조회 결과는 존재 확인 후에만 하위 속성이나 length에 접근하라. (60% · 타 앱 1회 — 맹신 금지)
+- 0008: 입력 컴포넌트: KeyboardAwareTextField·TargetSizeSelector (files: src/components/KeyboardAwareTextField.tsx, src/components/TargetSizeSelector.tsx, src/components/KeyboardAwareTextField.test.tsx, src/components/TargetSizeSelector.test.tsx)
