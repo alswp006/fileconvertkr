@@ -350,7 +350,16 @@ export function mockTossRewardAd() {
 // ── react-router-dom ──
 // Preserve actual router + override useNavigate for assertion.
 export function mockRouter() {
-  vi.mock("react-router-dom", async () => {
+  // vi.doMock (not vi.mock): this call already only ever runs at test-body runtime
+  // (it's inside a function, never hoisted), so doMock is behaviorally identical here.
+  // Using vi.mock's literal spelling would give this file a second static
+  // `vi.mock("react-router-dom", ...)` text match alongside any test file that declares
+  // its own separate one (e.g. to keep the real useLocation) — Vitest's hoisting scanner
+  // conflates the two and the test's own mock silently stops reaching dynamically-imported
+  // consumers (confirmed via isolated repro: an uncalled function containing a literal
+  // `vi.mock("react-router-dom", ...)` corrupts an unrelated file's hoisted one of the same
+  // specifier). doMock's spelling isn't scanned, so it can't collide.
+  vi.doMock("react-router-dom", async () => {
     const actual = await vi.importActual<typeof import("react-router-dom")>(
       "react-router-dom",
     );
