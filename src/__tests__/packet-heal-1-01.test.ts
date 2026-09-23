@@ -54,11 +54,16 @@ function renderAt(path: string, state?: unknown) {
 
 describe("진입점 라우팅 배선 + 미작성 페이지 플레이스홀더(단독 tsc·빌드 통과)", () => {
   it("AC-2[P0]: 홈에서 'HEIC → JPG/PNG' ListRow를 탭하면 /convert/heic로 이동해 같은 제목의 Top이 보인다", () => {
-    renderAt("/");
+    const { unmount } = renderAt("/");
     const row = screen.getByText(toolMeta.heic.title);
     row.closest('[role="listitem"]')?.dispatchEvent(
       new MouseEvent("click", { bubbles: true }),
     );
+    // useNavigate는 위에서 목으로 대체돼 실제 이동이 일어나지 않는다 —
+    // 이동 대상을 단언한 뒤, 그 경로로 진입해 Top 제목을 확인한다.
+    expect(mockNavigate).toHaveBeenCalledWith(toolMeta.heic.route);
+    unmount();
+    renderAt(toolMeta.heic.route);
 
     expect(
       screen.getByRole("navigation").querySelector("h1")?.textContent,

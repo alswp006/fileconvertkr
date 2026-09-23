@@ -1,5 +1,8 @@
 import type { NavigateFunction } from "react-router-dom";
 import type { ConversionJob } from "./types";
+import { jobStore } from "./jobStore";
+import { historyRepo } from "./storage/historyRepo";
+import { toHistoryEntry } from "./runJob";
 
 /**
  * finishJob: Save job and append to history, then navigate to result.
@@ -13,6 +16,10 @@ export async function finishJob(
   job: ConversionJob,
   navigate: NavigateFunction
 ): Promise<void> {
-  // TODO: Implement
-  throw new Error("finishJob not yet implemented");
+  jobStore.saveJob(job);
+  const { ok } = historyRepo.append(toHistoryEntry(job));
+
+  navigate("/result", {
+    state: ok ? { jobId: job.jobId } : { jobId: job.jobId, historySaveFailed: true },
+  });
 }

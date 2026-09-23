@@ -1,14 +1,14 @@
-// @ai-factory:placeholder
-// 배선 선행(wiring-first)이 깐 자리 페이지다 — App.tsx에 `/convert/compress`로 이미 연결돼 있다.
-// 이 화면을 담당하는 패킷은 이 파일을 **통째로 교체**하라(위 마커 주석 포함 — 마커가 남으면 산출물로 인정되지 않는다).
-import { PageShell } from "../components/PageShell";
+import { Top } from "@toss/tds-mobile";
+import { ScreenScaffold } from "@/components/ScreenScaffold";
+import { toolMeta } from "@/lib/toolMeta";
+
+// 라우팅 배선용 자리 화면 — 이 도구의 화면 패킷이 파일을 통째로 교체한다.
 export default function Compress() {
   return (
-    <PageShell>
-      <main data-testid="placeholder-compress">
-        <h1>이미지 압축 화면</h1>
-        <p>이 화면은 준비 중이에요.</p>
-      </main>
-    </PageShell>
+    <ScreenScaffold
+      top={<Top title={<Top.TitleParagraph>{toolMeta["compress"].title}</Top.TitleParagraph>} />}
+    >
+      {null}
+    </ScreenScaffold>
   );
 }

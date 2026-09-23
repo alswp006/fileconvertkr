@@ -2,6 +2,11 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
   return classes.filter(Boolean).join(' ');
 }
 
+// crypto.randomUUID를 쓰지 않는다(구형 WebView 호환) — ID 생성 공통 헬퍼
+export function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat('ko-KR').format(n);
 }

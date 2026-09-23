@@ -13,6 +13,7 @@ import { test, expect, type Page } from "@playwright/test";
 const ROUTES: { path: string; name: string }[] = [
   { path: "/", name: "home" },
   { path: "/result", name: "result" }, // jobStore는 메모리 전용 → 직접 진입은 만료 화면
+  { path: "/pdf/merge", name: "pdf-merge" },
   // { path: "/settings", name: "settings" },
 ];
 
