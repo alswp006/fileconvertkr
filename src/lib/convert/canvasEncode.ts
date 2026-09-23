@@ -39,7 +39,7 @@ function drawToCanvas(img: HTMLImageElement, width: number, height: number): HTM
 
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = 'rgb(255,255,255)';
     ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
   }
