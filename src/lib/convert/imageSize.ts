@@ -1,8 +1,7 @@
 /**
  * Image dimension detection utilities.
  *
- * Reads image width and height from a Blob without loading entire image into memory.
- * Uses canvas or img tag to measure dimensions.
+ * Reads image width and height from a Blob via an offscreen <img> element.
  */
 
 export interface ImageDimensions {
@@ -12,16 +11,22 @@ export interface ImageDimensions {
 
 /**
  * Gets image dimensions from a Blob.
- * @param blob - Image blob (JPEG, PNG, etc.)
- * @returns Promise with width and height
  */
 export async function getImageSize(blob: Blob): Promise<ImageDimensions> {
-  // TODO: Implement per AC-6
-  // 1. Create URL from blob: URL.createObjectURL(blob)
-  // 2. Load image and measure:
-  //    - Option A: Create <img>, read .width/.height after load
-  //    - Option B: Create canvas, draw and measure
-  // 3. Clean up: URL.revokeObjectURL()
-  // 4. Return { width, height }
-  return { width: 0, height: 0 };
+  const url = URL.createObjectURL(blob);
+
+  try {
+    return await new Promise<ImageDimensions>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        reject(new Error('이미지 크기를 읽을 수 없어요'));
+      };
+      img.src = url;
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

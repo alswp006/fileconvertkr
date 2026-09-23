@@ -12,6 +12,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // build.target: ['es2019','safari16'] — Android 7+ / iOS 16+ 호환 최소 타깃
+    target: ['es2019', 'safari16'],
     // @apps-in-toss/web-framework는 절대 external 금지.
     // SDK는 importmap이 아닌 window.ReactNativeWebView 글로벌로 통신하므로
     // 번들에 포함해야 정상 동작. external 설정 시 bare specifier가 번들 첫 줄에
