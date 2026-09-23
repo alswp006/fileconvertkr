@@ -146,7 +146,8 @@ export function mockTds() {
           children,
         ),
       {
-        TitleParagraph: ({ children }: any) => React.createElement("h1", null, children),
+        // span: Top already wraps title in <h1> — an inner h1 is invalid nesting (console.error).
+        TitleParagraph: ({ children }: any) => React.createElement("span", null, children),
       },
     ),
 
@@ -338,7 +339,11 @@ export function mockAnalytics() {
 // TossRewardAd is a project-local component that wraps content behind ad viewing.
 // In tests, render the children directly (ad always "watched").
 export function mockTossRewardAd() {
-  vi.mock("@/components/TossRewardAd", () => ({
+  // vi.doMock (not vi.mock): vi.mock is hoisted to the top of THIS module even inside a
+  // function body, so merely importing mocks.ts would swap the real gate for this stub in
+  // every test file — making "gate stays closed" tests (packet-0012 F7-AC-9) impossible.
+  // Call it before dynamically importing the page under test.
+  vi.doMock("@/components/TossRewardAd", () => ({
     TossRewardAd: ({ children, onReward }: any) => {
       // Auto-trigger onReward in tests to unlock content
       if (onReward) setTimeout(onReward, 0);
