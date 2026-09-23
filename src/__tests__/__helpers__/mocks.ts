@@ -137,11 +137,12 @@ export function mockTds() {
     ),
 
     Top: Object.assign(
-      ({ children, title }: any) =>
+      ({ children, title, right }: any) =>
         React.createElement(
           "nav",
           { role: "navigation" },
           title && React.createElement("h1", null, title),
+          right,
           children,
         ),
       {
