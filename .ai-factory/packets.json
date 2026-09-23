@@ -1,0 +1,830 @@
+[
+  {
+    "id": "0001",
+    "title": "도메인 타입·도구 메타·라우트·표기 유틸·ID 생성",
+    "epic": "4",
+    "task": {
+      "description": "src/lib/types.ts에 SPEC Data Models의 타입을 런타임 코드 없이 정의한다: ToolType, JobOptions, InputFileMeta, OutputNote, ConversionOutput(mimeType에 'image/webp' 포함), ConversionFailure, ConversionJob, HistoryEntry, ConvertPrefs, ConvertPrefsValues, ValidationError, ResultRouteState. 그 밖에 toolMeta(도구 표 5행), routes(TOOL_ROUTES, ResultRouteState 재수출), format(formatBytes·formatDate·formatStamp), id(createId)를 만든다.",
+      "acceptance_criteria": [
+        "formatBytes(509952) === '498KB', formatBytes(626688) === '612KB', formatBytes(7340032) === '7.0MB', formatBytes(4194304) === '4.0MB'",
+        "TZ=Asia/Seoul에서 formatDate('2026-09-24T05:30:00.000Z') === '2026.09.24 14:30'이고, formatStamp(new Date(2026, 8, 24, 14, 30)) === '20260924_1430'",
+        "TOOL_ORDER는 ['heic','compress','pdf-merge','pdf-to-image','pdf-split']이고, toolMeta[t].title은 순서대로 'HEIC → JPG/PNG','이미지 용량 줄이기','PDF 합치기','PDF → 이미지','PDF 나누기'. TOOL_ROUTES['pdf-split'] === '/pdf/split'",
+        "createId()를 1000회 호출한 결과가 모두 다르고 빈 문자열이 없으며, src/lib 소스에 'randomUUID' 문자열이 0건",
+        "types.ts에 const/let/function/class 선언이 0건이고, mimeType이 'image/webp'인 ConversionOutput 리터럴이 타입 오류 없이 할당되며, tsc --noEmit 오류가 0건"
+      ]
+    },
+    "covers": [
+      "F3-AC-11",
+      "F8-AC-1",
+      "F8-AC-2",
+      "F4-AC-1"
+    ],
+    "files": [
+      "src/lib/types.ts",
+      "src/lib/routes.ts",
+      "src/lib/toolMeta.ts",
+      "src/lib/format.ts",
+      "src/lib/id.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 오류 0건",
+      "types.ts는 export type/interface만 포함",
+      "toolMeta는 SPEC 도구 메타 표의 route·제목·부제·accept·파일 수·용량 제한을 그대로 담는 단일 진실원",
+      "createId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8)"
+    ],
+    "depends_on": [],
+    "db_schema": "type ToolType = 'heic'|'compress'|'pdf-merge'|'pdf-to-image'|'pdf-split'; interface ConversionOutput { id; sourceName; fileName; mimeType: 'image/jpeg'|'image/png'|'image/webp'|'application/pdf'; sizeBytes; sourceSizeBytes; blob: Blob; objectUrl; width?; height?; pageCount?; note?: 'ALREADY_UNDER_TARGET'|'TARGET_NOT_REACHED' } interface ConversionFailure { id; inputIndex; fileName; message } interface ConversionJob { jobId; tool; createdAt; options: JobOptions; inputs: InputFileMeta[]; outputs; failures; durationMs; status: 'success'|'partial' } interface HistoryEntry { id; tool; createdAt; status; inputCount; outputCount; failedCount; inputTotalBytes; outputTotalBytes; inputNames: string[]; outputNames: string[] } interface ConvertPrefs { id: 'prefs'; createdAt: string|null; updatedAt: string|null; heicFormat: 'jpg'|'png'; compressTargetKB: number; pdfImageFormat: 'jpg'|'png'; pdfImageScale: 1.5|2 } type ResultRouteState = { jobId: string; historySaveFailed?: true }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "저장소: validateFiles·prefs·historyRepo·jobStore",
+    "epic": "Epic 1: Data Layer",
+    "task": {
+      "description": "다음 네 가지를 구현한다. (1) validateFiles(files, tool): 확장자·MIME 판정, 파일당 30MB, 파일 수 상한, 합계 100MB. (2) prefs: 키 fileconvertkr:prefs:v1, 필드별 기본값 대체, createdAt·updatedAt 갱신 규칙. (3) historyRepo: 키 fileconvertkr:history:v1. append·load·clear, 100개 상한, 이름 정규화(5개·40자·코드 포인트 기준), QuotaExceeded 시 오래된 20개를 지우고 1회 재시도. (4) jobStore: 최대 3개 보관, 넘치면 가장 오래된 job의 objectURL 해제.",
+      "acceptance_criteria": [
+        "F1-AC-1: 키가 없는 상태에서 append하면 { ok: true }를 반환한다. 저장된 배열은 길이 1이고 [0].tool === 'heic', [0].id는 빈 문자열이 아니며, [0].createdAt은 new Date(x).toISOString() === x를 만족하고, 'updatedAt' in [0]은 false",
+        "F1-AC-2/AC-9: 100개가 있는 상태에서 append하면 길이 100을 유지하고 id 'old-99'가 없다. inputNames 7개는 앞 5개만 저장되고 inputCount는 7을 유지한다. 'a'.repeat(41)+'.jpg'는 'a'.repeat(39)+'…'(코드 포인트 40자)로 저장된다",
+        "F1-AC-5/AC-6: 값이 없거나 '{broken'이면 load()가 []를 반환하고 console.error는 0회. setItem이 QuotaExceededError를 던지면 오래된 20개를 제거하고 1회 재시도해서 성공 시 { ok: true }, 재실패 시 { ok: false }를 반환하며 예외를 던지지 않는다",
+        "F1-AC-3/AC-4: validateFiles([a.heic 2MB type '', b.jpg 1MB, c.HEIF 35MB type ''], 'heic')의 accepted는 [a.heic]이고, errors는 UNSUPPORTED_TYPE 'HEIC 파일만 선택할 수 있어요'와 FILE_TOO_LARGE '파일당 최대 30MB까지 선택할 수 있어요'. compress에 JPG 21개를 넣으면 accepted 20개와 TOO_MANY_FILES 1개, 25MB 5개를 넣으면 accepted 4개와 TOTAL_TOO_LARGE",
+        "F1-AC-8/AC-11: job A~D를 saveJob하면 getJob(A)는 undefined이고 A의 objectUrl마다 revokeObjectURL이 1회씩 호출된다. prefs.load() 기본값은 { id: 'prefs', createdAt: null, updatedAt: null, heicFormat: 'jpg', compressTargetKB: 500, pdfImageFormat: 'jpg', pdfImageScale: 1.5 }. save({ heicFormat: 'png' })는 두 시각을 현재 시각으로 채우고, 60초 뒤 save({ compressTargetKB: 1024 })는 updatedAt만 바꾸고 createdAt은 유지한다. 모든 값이 현재와 같으면 setItem 0회"
+      ]
+    },
+    "covers": [
+      "F1-AC-1",
+      "F1-AC-2",
+      "F1-AC-3",
+      "F1-AC-4",
+      "F1-AC-5",
+      "F1-AC-6",
+      "F1-AC-8",
+      "F1-AC-9",
+      "F1-AC-11"
+    ],
+    "files": [
+      "src/lib/validateFiles.ts",
+      "src/lib/storage/prefs.ts",
+      "src/lib/storage/historyRepo.ts",
+      "src/lib/jobStore.ts",
+      "src/lib/storage/storage.test.ts"
+    ],
+    "definition_of_done": [
+      "storage.test.ts에서 위 5개 AC 통과",
+      "historyRepo에는 append/load/clear만 있고, jobStore에는 saveJob/getJob만 있다(수정 API 없음)",
+      "clear()는 removeItem을 호출해서 getItem 결과가 null이 된다",
+      "도구별 UNSUPPORTED_TYPE 문구와 accept·상한은 toolMeta에서 읽는다",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "HistoryEntry[] → localStorage key 'fileconvertkr:history:v1' (최신이 index 0, 최대 100개, append 인자 타입 Omit<HistoryEntry,'id'|'createdAt'>) / ConvertPrefs → localStorage key 'fileconvertkr:prefs:v1' (save(partial: Partial<ConvertPrefsValues>)) / ConversionJob → 메모리 Map<string, ConversionJob> (최대 3개)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "변환 실행기 runJob·finishJob·deliverFile·useConversionRunner",
+    "epic": "Epic 1: Data Layer",
+    "task": {
+      "description": "runJob은 입력을 순차 처리하고, 파일마다 60초 타임아웃을 두며, 부분 성공과 onProgress를 지원한다. 실패마다 id와 inputIndex를 채운다. buildJob과 toHistoryEntry를 만든다. finishJob은 saveJob → append → navigate 1회 순으로 동작하고, 실패 시 historySaveFailed를 넘긴다. deliverFile은 saveBase64Data를 호출하고, 실패하면 앵커 클릭으로 대체한다. useConversionRunner 훅은 { running, progress, runPerFile, runSingle }을 반환한다.",
+      "acceptance_criteria": [
+        "F1-AC-7: 입력 3개 중 두 번째가 Error('decode')로 reject하면 outputs 2개와 failures [{ id: 비어 있지 않음, inputIndex: 1, message: '파일을 읽을 수 없어요. 다른 파일을 선택해주세요' }]가 나온다. onProgress는 (1,3), (2,3), (3,3) 순서. 60,000ms가 지나면 message는 '변환 시간이 너무 오래 걸려서 중단했어요'",
+        "F1-AC-10: [photo.jpg, other.jpg, photo.jpg]에서 두 photo.jpg가 실패하면 failures의 inputIndex는 [0, 2]이고 두 id는 서로 다르다",
+        "finishJob: append가 { ok: true }면 navigate('/result', { state: { jobId } })를 호출하고 state에 historySaveFailed 키가 없다. { ok: false }면 { jobId, historySaveFailed: true }를 넘긴다. 두 경우 모두 navigate는 정확히 1회이고, saveJob이 append보다 먼저 호출된다",
+        "deliverFile(IMG_0001.jpg)은 saveBase64Data를 { fileName: 'IMG_0001.jpg', mimeType: 'image/jpeg', data: data URL 접두어를 뗀 base64 }로 1회 호출한다. image/webp 출력은 mimeType 'image/webp'로 전달한다. saveBase64Data가 reject하고 앵커 click도 throw하면 Promise가 reject된다",
+        "useConversionRunner: 실행 중에는 running === true이고 progress가 { done, total }로 갱신된다. 모든 파일이 실패하면 { ok: false }를 반환하고 navigate·append는 0회, 끝나면 running === false"
+      ]
+    },
+    "covers": [
+      "F1-AC-6",
+      "F1-AC-7",
+      "F1-AC-10",
+      "F7-AC-3",
+      "F7-AC-4"
+    ],
+    "files": [
+      "src/lib/runJob.ts",
+      "src/lib/finishJob.ts",
+      "src/lib/deliverFile.ts",
+      "src/hooks/useConversionRunner.ts",
+      "src/lib/runJob.test.ts"
+    ],
+    "definition_of_done": [
+      "runJob.test.ts에서 F1-AC-7, F1-AC-10, finishJob 분기가 가짜 타이머로 통과",
+      "buildJob은 failures.length > 0이면 status를 'partial'로 두고, outputs가 0개면 job을 만들지 않는다",
+      "fetch/XMLHttpRequest/sendBeacon 사용 0건",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "runJob<T>(inputs: File[], process: (f: File) => Promise<T[]>, opts: { onProgress(done, total); signal?; timeoutMs?=60000 }) → { outputs: T[]; failures: ConversionFailure[] } / finishJob(job: ConversionJob, navigate: NavigateFunction): void",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "빌드 설정·변환 라이브러리 설치·HEIC 변환기",
+    "epic": "Epic 1: Data Layer",
+    "task": {
+      "description": "heic2any, pdf-lib, pdfjs-dist를 설치하고 vite.config.ts의 build.target을 ['es2019','safari16']으로 바꾼다. 기존 플러그인은 유지한다. 테스트 setup(jsdom, URL.createObjectURL mock)을 만든다. convert/heic.ts에는 isHeic, convertHeic(file, 'jpg'|'png')(JPG는 품질 0.92), decodeHeicToJpeg를 만들고, heic2any는 dynamic import로 불러온다. imageSize.ts에는 getImageSize(blob)를 만든다.",
+      "acceptance_criteria": [
+        "vite.config.ts의 build.target이 ['es2019','safari16']이고, npm run build가 성공한다",
+        "convertHeic(IMG_0001.heic, 'jpg')는 heic2any를 { toType: 'image/jpeg', quality: 0.92 }로 1회 호출하고, fileName 'IMG_0001.jpg', mimeType 'image/jpeg'를 반환한다. 'png'면 'IMG_0001.png'와 'image/png'",
+        "isHeic: type ''인 'c.HEIF'는 true, 'b.jpg'(image/jpeg)는 false",
+        "decodeHeicToJpeg는 heic2any를 toType 'image/jpeg'로 1회 호출하고 Blob 1개를 반환한다(배열 결과면 첫 요소)",
+        "heic.ts에 heic2any 정적 import 0건(await import('heic2any')만 사용)"
+      ]
+    },
+    "covers": [
+      "F5-AC-8",
+      "F2-AC-1",
+      "F2-AC-2",
+      "F3-AC-8"
+    ],
+    "files": [
+      "package.json",
+      "vite.config.ts",
+      "src/test/setup.ts",
+      "src/lib/convert/heic.ts",
+      "src/lib/convert/imageSize.ts"
+    ],
+    "definition_of_done": [
+      "package.json의 dependencies에 heic2any, pdf-lib, pdfjs-dist가 있다",
+      "vitest 실행 시 setup.ts가 로드된다",
+      "main.tsx는 수정하지 않는다",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "heic2any",
+      "pdf-lib",
+      "pdfjs-dist",
+      "vitest",
+      "@testing-library/react",
+      "jsdom"
+    ],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "이미지 압축 엔진 encodeToTarget·compressToTarget",
+    "epic": "Epic 1: Data Layer",
+    "task": {
+      "description": "encodeToTarget는 캔버스를 흰 배경으로 채운 뒤 toBlob('image/jpeg', q)로 품질을 이분 탐색한다. 해상도 1단계당 최대 8회, 축소는 최대 5회이고, 목표 이하 후보 중 가장 큰 것을 고른다. 목표 이하 후보가 없으면 최소 결과를 TARGET_NOT_REACHED로 반환한다. compressToTarget는 HEIC면 먼저 JPEG로 디코드하고, 목표 이하면 원본(또는 디코드 결과)을 원래 형식 그대로 ALREADY_UNDER_TARGET으로 반환한다. 그 밖의 경우 JPEG로 재인코딩한다.",
+      "acceptance_criteria": [
+        "F3-AC-2: 품질에 비례한 크기를 돌려주는 toBlob mock에서 해상도 단계당 toBlob 호출은 8회 이하, 축소는 5회 이하이고, 채택된 결과는 목표 이하 후보 중 sizeBytes가 가장 크다",
+        "F3-AC-3: 목표 512,000에 small.jpg(307,200B)를 넣으면 blob은 입력 File이고 note는 'ALREADY_UNDER_TARGET', fileName은 'small_compressed.jpg', toBlob은 0회",
+        "F3-AC-4: 5회 축소 후 최소 결과가 626,688B면 sizeBytes === 626688이고 note === 'TARGET_NOT_REACHED'",
+        "F3-AC-10: 목표 1,048,576에 IMG_2.heic(409,600B, type '')를 넣고 heic2any가 716,800B JPEG를 반환하면 blob은 그 Blob과 같은 객체이고, mimeType 'image/jpeg', fileName 'IMG_2_compressed.jpg', sourceSizeBytes 409600, toBlob은 0회",
+        "F3-AC-11: 목표 512,000에 sticker.webp(204,800B)를 넣으면 heic2any·toBlob 0회, blob은 입력 File, mimeType 'image/webp', fileName 'sticker_compressed.webp'. type이 ''여도 확장자 .webp로 'image/webp'를 판정한다"
+      ]
+    },
+    "covers": [
+      "F3-AC-2",
+      "F3-AC-3",
+      "F3-AC-4",
+      "F3-AC-10",
+      "F3-AC-11"
+    ],
+    "files": [
+      "src/lib/convert/canvasEncode.ts",
+      "src/lib/convert/compress.ts",
+      "src/lib/convert/compress.test.ts"
+    ],
+    "definition_of_done": [
+      "compress.test.ts에서 위 5개 AC 통과",
+      "type이 비었을 때 확장자로 형식을 정한다: .jpg/.jpeg → image/jpeg, .png → image/png, .webp → image/webp",
+      "재인코딩 결과는 항상 image/jpeg와 {base}_compressed.jpg",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "compressToTarget(file: File, targetBytes: number) → Promise<{ blob; fileName; mimeType; sizeBytes; sourceSizeBytes; width?; height?; note? }>",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0006",
+    "title": "PDF 엔진: 범위 파서·합치기·나누기·렌더러",
+    "epic": "Epic 1: Data Layer",
+    "task": {
+      "description": "pageRanges.ts: parsePageRanges(정렬·중복 제거된 페이지 목록), parseRangeGroups(입력 순서대로 묶음 유지), 분할 파일명(페이지 수 자릿수로 0 채우기). merge.ts: readPdfPageCount와 mergePdfs(pdf-lib, 암호 PDF는 'ENCRYPTED'). split.ts: splitPdf. render.ts: pdfjs-dist/legacy/build/pdf.mjs를 dynamic import하고, workerSrc는 ?url 로컬 경로. loadPdf와 renderPageToBlob(scale, format)을 제공한다.",
+      "acceptance_criteria": [
+        "F5-AC-3: parsePageRanges('1-3,5, 7-7', 10)는 { ok: true, pages: [1,2,3,5,7] }, '3,1-2,2'는 [1,2,3]. '3-1', '0', 'a', '1--2', ''는 { ok: false, code: 'INVALID' }, 6페이지 문서의 '8'은 { ok: false, code: 'OUT_OF_RANGE' }",
+        "F6-AC-2/AC-9 파일명: 4페이지 문서의 '1-2, 3'은 ['보고서_1-2.pdf', '보고서_p3.pdf']. 12페이지 '페이지마다'는 '보고서_p01.pdf'~'보고서_p12.pdf'. '1-3, 4-9, 10-12'는 ['보고서_01-03.pdf', '보고서_04-09.pdf', '보고서_10-12.pdf']에 pageCount [3,6,3], '5'는 ['보고서_p05.pdf']",
+        "mergePdfs([a(3p), b(2p)])의 결과 pageCount는 5이고 페이지 순서는 a1,a2,a3,b1,b2(pdf-lib로 만든 테스트 PDF로 검증). 암호 PDF는 code 'ENCRYPTED'인 에러를 던진다",
+        "render.ts는 pdfjs를 'pdfjs-dist/legacy/build/pdf.mjs'에서만 import하고, workerSrc는 '?url'로 번들된 경로(http 없음)다. 렌더 시 page.getViewport({ scale })를 쓰고, PasswordException은 'ENCRYPTED', 그 밖의 에러는 'UNREADABLE'로 바꾼다",
+        "merge.ts, split.ts, render.ts에 pdf-lib·pdfjs-dist 런타임 정적 import 0건(type import만 허용)"
+      ]
+    },
+    "covers": [
+      "F5-AC-3",
+      "F5-AC-8",
+      "F6-AC-9",
+      "F6-AC-2",
+      "F4-AC-1",
+      "F4-AC-4"
+    ],
+    "files": [
+      "src/lib/pdf/pageRanges.ts",
+      "src/lib/pdf/merge.ts",
+      "src/lib/pdf/split.ts",
+      "src/lib/pdf/render.ts",
+      "src/lib/pdf/pageRanges.test.ts"
+    ],
+    "definition_of_done": [
+      "pageRanges.test.ts에서 파서와 파일명 AC 통과",
+      "splitPdf(file, groups, totalPages, onProgress)는 결과 파일 1개를 만들 때마다 onProgress를 호출한다",
+      "공백은 무시한다",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "parsePageRanges(input: string, totalPages: number) → { ok: true; pages: number[] } | { ok: false; code: 'INVALID'|'OUT_OF_RANGE' } / parseRangeGroups(input, totalPages) → { ok: true; groups: { start; end }[] } | { ok: false; code }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0007",
+    "title": "파일 선택 컴포넌트: FilePickSection·SelectedFileList·MergeFileList·PdfSingleFilePicker",
+    "epic": "Epic 2: Shared UI Components (API Routes 해당 없음 — 클라이언트 전용)",
+    "task": {
+      "description": "도구 화면이 함께 쓰는 파일 선택 UI를 만든다. FilePickSection은 숨김 input을 TDS Button으로 열고, 기존 선택과 새 파일을 합쳐 validateFiles로 검사한다. 오류는 Toast(top)로 표시하고 input.value를 ''로 초기화한다. SelectedFileList는 행마다 44px 삭제 버튼을 둔다. MergeFileList는 순번과 위로/아래로 버튼, '페이지 확인 중' 부제를 둔다. PdfSingleFilePicker는 loadPdf로 암호·손상 PDF를 거른다.",
+      "acceptance_criteria": [
+        "F2-AC-5: tool 'heic'에서 scan.pdf를 선택하면 Toast 'HEIC 파일만 선택할 수 있어요'가 뜨고 onAdd는 호출되지 않으며, input.value === ''",
+        "F4-AC-5: 이미 28MB×3개가 선택된 상태에서 28MB를 추가하면 Toast '전체 용량은 최대 100MB까지 가능해요'가 뜨고 onAdd는 호출되지 않는다",
+        "F2-AC-8: 2행 중 IMG_0001.heic의 '삭제'를 누르면 onRemove(0)이 호출된다. 삭제 버튼의 hit area 래퍼는 minWidth·minHeight 44px",
+        "F4-AC-7: [a,b,c]에서 첫 행 '위로'와 마지막 행 '아래로'만 disabled이고 나머지 4개는 enabled. pageCount가 null인 행의 부제는 '페이지 확인 중'",
+        "F5-AC-6: loadPdf가 ENCRYPTED로 실패하면 Toast '암호가 걸린 PDF는 변환할 수 없어요', 그 밖의 실패는 Toast '파일을 읽을 수 없어요. 다른 파일을 선택해주세요'. 두 경우 모두 onPicked는 호출되지 않는다"
+      ]
+    },
+    "covers": [
+      "F2-AC-5",
+      "F2-AC-8",
+      "F4-AC-5",
+      "F4-AC-7",
+      "F5-AC-6"
+    ],
+    "files": [
+      "src/components/FilePickSection.tsx",
+      "src/components/SelectedFileList.tsx",
+      "src/components/MergeFileList.tsx",
+      "src/components/PdfSingleFilePicker.tsx",
+      "src/components/FilePickers.test.tsx"
+    ],
+    "definition_of_done": [
+      "FilePickers.test.tsx에서 5개 AC 통과",
+      "모든 UI는 @toss/tds-mobile(Button, ListRow, Toast)로 만든다. 인라인 스타일은 flex 배치와 44px hit area에만 쓴다",
+      "disabled prop이 true면 선택·삭제·이동 버튼이 모두 disabled",
+      "HEX 색상 0건, tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS Button(variant weak, '사진 선택' 등 도구별 라벨), 숨김 <input type=\"file\" accept={toolMeta[tool].accept} multiple={maxFiles>1}>를 inputRef.current.click()으로 연다. change 후 input.value = ''. SelectedFileList: ListRow(contents=ListRow.Texts 2RowTypeA top=파일명 bottom=formatBytes(size)), right에 TDS Button size small '삭제'를 display:flex·minWidth/minHeight 44px 래퍼로 감싼다. MergeFileList: ListRow left=순번(1부터), right=위로/아래로/삭제 버튼(각 44px 이상), bottom='페이지 확인 중' 또는 'N페이지 · 크기'. Toast position=\"top\". Chip·버튼 탭 시 generateHapticFeedback({ type: 'tickWeak' }). 색상은 var(--tds-color-*)만 쓴다."
+  },
+  {
+    "id": "0008",
+    "title": "입력 컴포넌트: KeyboardAwareTextField·TargetSizeSelector",
+    "epic": "Epic 2: Shared UI Components (API Routes 해당 없음 — 클라이언트 전용)",
+    "task": {
+      "description": "KeyboardAwareTextField는 TDS TextField를 감싼다. focus 시 scrollIntoView({ block: 'center' })를 호출하고, enterKeyHint='done', Enter를 누르면 blur, inputMode는 prop 그대로 전달한다. TargetSizeSelector는 목표 용량 프리셋 Chip(SPEC F3 화면 정의, '500KB' 포함)과 '직접 입력' Chip으로 구성한다. 직접 입력은 숫자만 받고, 50~10240KB를 벗어나면 hasError와 함께 onChange(null)을 호출한다.",
+      "acceptance_criteria": [
+        "F3-AC-5: '직접 입력'에서 30, '', 20000을 입력하면 TextField가 hasError이고 helperText는 '50KB~10,240KB 사이로 입력해주세요'이며, onChange(null)이 호출된다",
+        "F3-AC-5: 'abc'를 입력해도 필드 값이 바뀌지 않는다(숫자 외 문자 필터)",
+        "F3-AC-7: 목표 용량 입력에 focus하면 scrollIntoView({ block: 'center' })가 1회 호출되고, input에 inputMode=\"numeric\"과 enterKeyHint=\"done\"이 있으며, Enter keydown 시 blur된다",
+        "F6-AC-7: KeyboardAwareTextField 단독 렌더에서도 focus → scrollIntoView center, Enter → blur가 동작한다",
+        "Chip '500KB'를 탭하면 onChange(500)이 호출되고, 해당 Chip이 selected가 된다"
+      ]
+    },
+    "covers": [
+      "F3-AC-5",
+      "F3-AC-7",
+      "F6-AC-7"
+    ],
+    "files": [
+      "src/components/KeyboardAwareTextField.tsx",
+      "src/components/TargetSizeSelector.tsx",
+      "src/components/KeyboardAwareTextField.test.tsx",
+      "src/components/TargetSizeSelector.test.tsx"
+    ],
+    "definition_of_done": [
+      "두 테스트 파일에서 5개 AC 통과",
+      "Chip 탭 시 generateHapticFeedback({ type: 'tickWeak' })",
+      "TDS TextField·Chip만 사용하고, 여백은 Spacing으로만 조절",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TargetSizeSelector: Paragraph.Text typography=\"t5\" '목표 용량' → Spacing size={12} → <div style={{display:'flex',flexWrap:'wrap',gap:8}}>에 Chip 프리셋들과 '직접 입력'(단일 선택, variant filled/outlined, disabled prop 지원) → '직접 입력'을 선택하면 Spacing size={12} + KeyboardAwareTextField(label '목표 용량(KB)', inputMode=\"numeric\", hasError, helperText). 모바일 키보드가 입력을 가리지 않도록 focus 시 scrollIntoView center. Chip의 터치 영역은 44px 이상."
+  },
+  {
+    "id": "0009",
+    "title": "결과 화면 무료 층 컴포넌트: FreeTier·ResultSummary·OutputRow·FailedList·ExpiredView",
+    "epic": "Epic 2: Shared UI Components (API Routes 해당 없음 — 클라이언트 전용)",
+    "task": {
+      "description": "job을 prop으로 받는 무료 층을 만든다. data-testid free-tier 안에 result-summary Card(SummaryHero: compress는 절감률 %, 그 외는 결과 개수 '개'·'변환 완료'), output-row 목록, failed-list가 들어간다. OutputRow의 '저장'은 deliverFile을 호출하고, 결과에 따라 Toast를 띄우고 라벨을 '저장됨'으로 바꾼다. 세션 첫 성공이면 requestReviewOnce를 호출한다. TARGET_NOT_REACHED 문구를 표시한다. ExpiredView는 만료 화면이다.",
+      "acceptance_criteria": [
+        "F7-AC-1: heic job(3개)이면 free-tier 안 SummaryHero에 값 3, 단위 '개', 라벨 '변환 완료'가 있고, output-row 3개에 각각 '저장' Button이 enabled",
+        "F7-AC-3: IMG_0001.jpg의 '저장'을 탭하면 deliverFile이 1회 호출되고, 성공 시 Toast '사진을 저장했어요'(PDF는 '파일을 저장했어요')와 함께 라벨이 '저장됨'으로 바뀐다. 세션 첫 성공에서만 requestReviewOnce 1회",
+        "F7-AC-4: deliverFile이 reject하면 Toast '저장에 실패했어요. 다시 시도해주세요'가 뜨고, 라벨은 '저장'을 유지하며 requestReviewOnce는 0회",
+        "F7-AC-11/AC-6: failures 2개면 failed-list 제목이 '변환하지 못한 파일 2개'이고, failed-row 제목은 'photo.jpg (1번째 파일)', 'photo.jpg (3번째 파일)', 부제는 message. compress(in 3,145,728 / out 509,952)면 SummaryHero는 84와 '%'",
+        "F3-AC-4/F7-AC-5: note가 TARGET_NOT_REACHED이고 크기가 626,688B인 행에 '목표 용량까지 줄이지 못했어요 (최소 612KB)'가 표시된다. ExpiredView는 Asset.ContentIcon, '변환 결과가 만료됐어요', '처음으로'만 렌더하고, '처음으로'를 누르면 navigate('/', { replace: true })"
+      ]
+    },
+    "covers": [
+      "F7-AC-1",
+      "F7-AC-3",
+      "F7-AC-4",
+      "F7-AC-5",
+      "F7-AC-11",
+      "F3-AC-4"
+    ],
+    "files": [
+      "src/components/result/FreeTier.tsx",
+      "src/components/result/ResultSummary.tsx",
+      "src/components/result/OutputRow.tsx",
+      "src/components/result/FailedList.tsx",
+      "src/components/result/ExpiredView.tsx"
+    ],
+    "definition_of_done": [
+      "컴포넌트만 만들고 화면 파일(src/pages)은 만들지 않는다",
+      "failed-row의 React key는 failure.id, 표시 순번은 inputIndex + 1",
+      "저장 성공 시 generateHapticFeedback({ type: 'success' })",
+      "HEX 색상 0건, tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "<div data-testid=\"free-tier\"> <div data-testid=\"result-summary\"><Card><SummaryHero label value={<Amount value unit typography=\"t1\"/>} /></Card></div> <Spacing size={24}/> output-row마다 ListRow(left: 이미지 결과는 objectUrl 썸네일, PDF는 Asset.ContentIcon / contents: ListRow.Texts 2RowTypeA top=fileName bottom='formatBytes(sourceSizeBytes) → formatBytes(sizeBytes)' 또는 note 문구 / right: TDS Button size small '저장'|'저장됨') <Spacing size={24}/> failures가 있으면 <div data-testid=\"failed-list\"><Card> 제목 '변환하지 못한 파일 N개' + failed-row ListRow</Card></div></div>. ExpiredView: Asset.ContentIcon + Paragraph.Text '변환 결과가 만료됐어요' + Button display=\"block\" '처음으로'. Toast position=\"top\". 저장 문구에 '다운로드'라는 단어를 쓰지 않는다."
+  },
+  {
+    "id": "0010",
+    "title": "결과 화면 잠금 섹션·하단 버튼·결과 알림 훅",
+    "epic": "Epic 2: Shared UI Components (API Routes 해당 없음 — 클라이언트 전용)",
+    "task": {
+      "description": "LockedSection은 locked-teaser(잠금 해제 전에만 표시)를 렌더하고, 그 아래 locked-gate 안에 <TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}><LockedTier/></TossRewardAd>를 둔다. LockedTier는 마운트 시 logImpression('result_locked_tier')과 onUnlocked를 호출하고, 파일별 리포트·소요 시간·'모두 저장'(300ms 간격)을 보여준다. ResultFooter에는 공유와 재변환 버튼을 둔다. useResultNotices는 historySaveFailed Toast를 1회 띄운다.",
+      "acceptance_criteria": [
+        "F7-AC-2: 게이트가 열리면 locked-tier 안에 '파일별 상세 리포트' 행 3개('2.1MB → 1.3MB · −38%' 형식과 MiniBar), '총 소요 시간 N.N초', '모두 저장 (3개)'가 표시되고 locked-teaser는 DOM에서 사라진다",
+        "F7-AC-2/AC-4: '모두 저장'을 누르면 deliverFile이 3회 순차 호출되고 호출 간격은 300ms 이상이며, Toast '3개 파일을 저장했어요'가 뜬다. 1개가 실패하면 Toast는 '2개 저장, 1개 실패'",
+        "LockedTier는 마운트될 때만 logImpression('result_locked_tier')을 1회 호출한다. 마운트되지 않으면 0회",
+        "F7-AC-7: '공유하기'를 누르면 logClick('result_share') 다음 shareApp()이 1회 호출되고, '다른 파일 변환하기'를 누르면 navigate(TOOL_ROUTES[job.tool])('/pdf/merge' 등)",
+        "F7-AC-12: useResultNotices가 state { jobId, historySaveFailed: true }를 받으면 Toast '이력을 저장하지 못했어요. 변환 파일은 그대로 저장할 수 있어요'를 1회 띄우고 navigate('/result', { replace: true, state: { jobId } })를 1회 호출한다(StrictMode에서도 1회). 플래그가 없으면 0회"
+      ]
+    },
+    "covers": [
+      "F7-AC-2",
+      "F7-AC-4",
+      "F7-AC-7",
+      "F7-AC-12"
+    ],
+    "files": [
+      "src/components/result/LockedSection.tsx",
+      "src/components/result/LockedTeaser.tsx",
+      "src/components/result/LockedTier.tsx",
+      "src/components/result/ResultFooter.tsx",
+      "src/hooks/useResultNotices.ts"
+    ],
+    "definition_of_done": [
+      "템플릿 TossRewardAd를 수정하거나 재구현하지 않는다",
+      "핵심 결과(무료 층)는 게이트 밖에 두고, 게이트 안에는 더 깊은 층만 둔다",
+      "useResultNotices는 useRef로 중복 실행을 막는다",
+      "HEX 색상 0건, tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "LockedTeaser(data-testid=\"locked-teaser\"): Card + Paragraph.Text로 '파일별 상세 리포트·모두 저장' 안내. <div data-testid=\"locked-gate\"><TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}><LockedTier/></TossRewardAd></div>. LockedTier(data-testid=\"locked-tier\"): Paragraph.Text t5 '파일별 상세 리포트' → ListRow마다 '원본 → 결과 · −N%'와 MiniBar(flex 레이아웃, 색상은 var(--tds-color-*)) → Paragraph.Text '총 소요 시간 N.N초' → Button variant weak display=\"block\" '모두 저장 (N개)'. ResultFooter: Button display=\"block\" '공유하기'(generateHapticFeedback success) + Button variant weak '다른 파일 변환하기'. Toast position=\"top\"."
+  },
+  {
+    "id": "0011",
+    "title": "홈 화면 / (도구 목록)",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/Home.tsx에 홈 화면을 만든다. ScreenScaffold 안에 Top '파일 변환', 기기 내 처리 안내 문구, toolMeta 순서대로 도구 ListRow 5개, 하단 FloatingTabBar(변환·이력)를 둔다. 행을 탭하면 tickWeak 햅틱 → logClick('tool_select_{tool}') → navigate(TOOL_ROUTES[tool]) 순서로 실행한다. 설치 유도 문구와 외부 링크는 넣지 않는다.",
+      "acceptance_criteria": [
+        "F8-AC-1: / 렌더 시 ListRow 5개가 'HEIC → JPG/PNG', '이미지 용량 줄이기', 'PDF 합치기', 'PDF → 이미지', 'PDF 나누기' 순서로 표시된다",
+        "F8-AC-1: 'HEIC → JPG/PNG' 행을 탭하면 logClick('tool_select_heic') 다음에 navigate('/convert/heic')가 1회 호출된다",
+        "F8-AC-7: 화면 텍스트에 '설치', '다운로드', 'App Store', 'Play 스토어'가 0건이고, href가 http(s)://로 시작하는 <a>가 0개",
+        "FloatingTabBar의 '이력' 탭을 누르면 navigate('/history')가 호출된다"
+      ]
+    },
+    "covers": [
+      "F8-AC-1",
+      "F8-AC-7"
+    ],
+    "files": [
+      "src/pages/Home.tsx",
+      "src/pages/Home.test.tsx"
+    ],
+    "definition_of_done": [
+      "Home.test.tsx에서 4개 AC 통과",
+      "ListRow 높이 56px 이상(TDS 기본값을 덮어쓰지 않음)",
+      "HEX 색상 0건, 인라인 여백 덮어쓰기 0건",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: PageShell\nTDS Components (whitelist): ScreenScaffold, Top, Paragraph, Spacing, ListRow, Asset.ContentIcon, FloatingTabBar\nLayout:\n<ScreenScaffold>\n  <Top title={<Top.TitleParagraph>파일 변환</Top.TitleParagraph>} />\n  <Spacing size={8} />\n  <Paragraph.Text typography=\"t6\" color=\"secondary\">파일은 기기 안에서만 변환돼요. 서버로 올라가지 않아요.</Paragraph.Text>\n  <Spacing size={16} />\n  {TOOL_ORDER.map(tool => (   // heic → compress → pdf-merge → pdf-to-image → pdf-split (toolMeta)\n    <ListRow key={tool} onClick={() => select(tool)}\n      left={<Asset.ContentIcon /* 도구별 아이콘 */ />}\n      contents={<ListRow.Texts type=\"2RowTypeA\" top={toolMeta[tool].title} bottom={toolMeta[tool].subtitle} />}\n      right={/* 우측 화살표: ListRow .d.ts의 화살표 지원 확인 후 사용 */} />\n  ))}\n  <Spacing size={80} />          {/* FloatingTabBar에 가리지 않게 */}\n  <FloatingTabBar /* 활성 탭: 변환 */ />\n</ScreenScaffold>\nStates: Loading / Empty / Error: 해당 없음(정적 목록)\nInteractions:\n- 도구 ListRow를 탭하면 generateHapticFeedback({ type: 'tickWeak' }) → logClick('tool_select_{tool}') → navigate(TOOL_ROUTES[tool]) 순서로 실행해요.\n- '이력' 탭을 누르면 tickWeak 후 /history로 가요. FloatingTabBar에 햅틱이 없으면 onChange에서 호출해요.\n- ListRow 높이는 56px 이상이에요.\n공통: Toast는 position=\"top\", 색상은 var(--tds-color-*)만."
+  },
+  {
+    "id": "0012",
+    "title": "변환 결과 화면 /result (공통 payoff)",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/Result.tsx는 location.state(ResultRouteState | null)의 jobId로 jobStore.getJob을 조회한다. job이 없으면 ExpiredView만 렌더한다. job이 있으면 FreeTier → ad-slot-mid(AdSlot) → LockedSection → ad-slot-bottom(AdSlot) → ResultFooter 순서로 조립하고, useResultNotices를 호출한다. F7 AC-9 잠금 상태 통합 테스트도 이 패킷이 작성한다.",
+      "acceptance_criteria": [
+        "F7-AC-1: 게이트가 자동으로 열리는 환경(slot ID 미설정)에서 heic job으로 진입하면 free-tier SummaryHero가 3/'개'/'변환 완료'이고, output-row 3개의 '저장'이 enabled",
+        "F7-AC-5: state가 null이거나 { jobId: 'expired-1' }이면 크래시 없이 만료 화면만 렌더한다. free-tier, locked-teaser, locked-gate, locked-tier, ad-slot-mid, ad-slot-bottom 요소는 0개",
+        "F7-AC-6: compress job(in 3,145,728 / out 509,952, failures 1개)이면 SummaryHero는 84와 '%', failed-list 제목은 '변환하지 못한 파일 1개'. DOM 순서는 free-tier → ad-slot-mid → locked-tier → ad-slot-bottom이고, 광고 슬롯 두 개는 free-tier의 자손이 아니다",
+        "F7-AC-9: VITE_TOSS_AD_SLOT_ID='test-slot', loadFullScreenAd는 성공 mock, showFullScreenAd는 대기 mock인 환경에서 locked-tier는 0개이고 logImpression('result_locked_tier')도 0회",
+        "F7-AC-12: state { jobId, historySaveFailed: true }로 진입하면 Toast가 1회 뜨고 navigate('/result', { replace: true, state: { jobId } })가 1회 호출되며, 저장 버튼은 enabled"
+      ]
+    },
+    "covers": [
+      "F7-AC-1",
+      "F7-AC-5",
+      "F7-AC-6",
+      "F7-AC-9",
+      "F7-AC-12",
+      "F1-AC-6"
+    ],
+    "files": [
+      "src/pages/Result.tsx",
+      "src/pages/Result.test.tsx",
+      "src/pages/Result.locked.test.tsx"
+    ],
+    "definition_of_done": [
+      "두 테스트 파일에서 5개 AC 통과, 실행 중 console.error 0회",
+      "배너는 템플릿 <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} />를 data-testid 래퍼 div로 감싸서 사용",
+      "결과 화면 전체를 TossRewardAd로 감싸지 않는다",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0009",
+      "0010"
+    ],
+    "db_schema": "location.state: ResultRouteState | null → jobStore.getJob(jobId): ConversionJob | undefined",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: PageShell. <ScreenScaffold><Top title={<Top.TitleParagraph>변환 결과</Top.TitleParagraph>} /><Spacing size={16}/><FreeTier job/><Spacing size={24}/><div data-testid=\"ad-slot-mid\"><AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID}/></div><Spacing size={24}/><LockedSection job/><Spacing size={24}/><div data-testid=\"ad-slot-bottom\"><AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID}/></div><Spacing size={16}/><ResultFooter job/></ScreenScaffold>. 만료 시에는 <ScreenScaffold><ExpiredView/></ScreenScaffold>만 렌더. Toast position=\"top\". 광고는 결과 콘텐츠 사이와 뒤에만 비침투적으로 둔다. 색상은 var(--tds-color-*)만."
+  },
+  {
+    "id": "0013",
+    "title": "HEIC 변환 화면 /convert/heic",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/Heic.tsx: JPG/PNG Chip(prefs.heicFormat에서 초기값을 읽고, 탭하면 prefs.save), FilePickSection('사진 선택'), SelectedFileList, SubmitFooter의 '변환하기'로 구성한다. useConversionRunner.runPerFile로 convertHeic를 실행하고, 성공하면 finishJob으로 /result에 간다. 모두 실패하면 화면에 머물며 Toast를 띄운다. 실행 중에는 Chip, 선택, 삭제를 막는다.",
+      "acceptance_criteria": [
+        "F2-AC-1/AC-2: jpg 설정에서 2개를 변환하면 heic2any가 파일마다 { toType: 'image/jpeg', quality: 0.92 }로 호출되고 fileName은 ['IMG_0001.jpg','IMG_0002.jpg']. append 인자는 { tool: 'heic', inputCount: 2, outputCount: 2, failedCount: 0 }, navigate('/result', { state: { jobId } }). 'PNG' Chip을 탭하면 prefs.heicFormat이 'png'로 저장되고, 다시 마운트해도 PNG가 선택돼 있다",
+        "F2-AC-3/AC-4: 0개면 '변환할 HEIC 사진을 선택해주세요'가 보이고 '변환하기'는 disabled. 5개 중 2개가 끝났으면 Button은 loading이고 '2/5 변환 중'이 보이며, '사진 선택'·Chip·삭제가 disabled",
+        "F2-AC-6: broken.heic 1개가 실패하면 화면에 머물며 Toast '변환에 실패했어요. 다른 파일로 시도해주세요'가 뜬다. navigate·append는 0회, 선택 목록은 유지되고 버튼은 다시 활성화된다",
+        "F2-AC-7: fetch, XMLHttpRequest.prototype.open, navigator.sendBeacon spy의 호출이 모두 0회",
+        "F2-AC-9: append가 { ok: false }이고 /convert/heic와 Result를 함께 등록한 MemoryRouter면 navigate가 historySaveFailed: true로 1회 호출된다. /result에서 Toast 1회, output-row 1개, '저장' enabled"
+      ]
+    },
+    "covers": [
+      "F2-AC-1",
+      "F2-AC-2",
+      "F2-AC-3",
+      "F2-AC-4",
+      "F2-AC-5",
+      "F2-AC-6",
+      "F2-AC-7",
+      "F2-AC-9"
+    ],
+    "files": [
+      "src/pages/Heic.tsx",
+      "src/pages/Heic.test.tsx"
+    ],
+    "definition_of_done": [
+      "Heic.test.tsx에서 5개 AC 통과",
+      "'변환하기'에 generateHapticFeedback({ type: 'success' }), Chip에 tickWeak",
+      "텍스트 입력 없음(키보드 처리 불필요)",
+      "HEX 색상 0건, tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0007",
+      "0012"
+    ],
+    "db_schema": "ConvertPrefs.heicFormat → 'fileconvertkr:prefs:v1' / JobOptions { tool: 'heic'; format; quality: 0.92 }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA\nTDS Components (whitelist): ScreenScaffold, Top, Paragraph, Spacing, Chip, Button, ListRow, SubmitFooter, Toast, FilePickSection, SelectedFileList\nLayout:\n<ScreenScaffold>\n  <Top title={<Top.TitleParagraph>HEIC → JPG/PNG</Top.TitleParagraph>} />\n  <Spacing size={8} />\n  <Paragraph.Text typography=\"t6\" color=\"secondary\">아이폰 사진을 카톡·이메일에서 열리는 형식으로 바꿔요</Paragraph.Text>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t5\">형식</Paragraph.Text>\n  <Spacing size={12} />\n  <div style={{ display: 'flex', gap: 8 }}>                        {/* Pattern B, 단일 선택 */}\n    <Chip label=\"JPG\" variant={fmt === 'jpg' ? 'filled' : 'outlined'} selected={fmt === 'jpg'} disabled={running} />\n    <Chip label=\"PNG\" variant={fmt === 'png' ? 'filled' : 'outlined'} selected={fmt === 'png'} disabled={running} />\n  </div>\n  <Spacing size={24} />\n  <FilePickSection tool=\"heic\" ('사진 선택') />\n  <Spacing size={16} />\n  {files.length === 0 ? <Paragraph.Text>변환할 HEIC 사진을 선택해주세요</Paragraph.Text> : <SelectedFileList />}\n  <SubmitFooter><Button display=\"block\" loading={running} disabled={files.length===0}>변환하기</Button> + 진행 중 'k/n 변환 중'</SubmitFooter>\n</ScreenScaffold>\nStates: Empty(0개 문구+disabled), Loading(loading + 'k/n 변환 중', 입력 잠금), Error(Toast position=\"top\", 목록 유지)."
+  },
+  {
+    "id": "0014",
+    "title": "이미지 압축 화면 /convert/compress",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/Compress.tsx: TargetSizeSelector(초기값은 prefs.compressTargetKB), FilePickSection(tool compress), SelectedFileList, SubmitFooter의 '압축하기'로 구성한다. 파일마다 compressToTarget(file, KB×1024)를 runPerFile로 실행하고, 실행할 때 prefs.compressTargetKB를 저장한다. 성공하면 finishJob으로 /result에 간다. 목표 값이 null이거나 파일이 0개면 버튼을 비활성화한다.",
+      "acceptance_criteria": [
+        "F3-AC-1: '500KB'로 photo.jpg(3,145,728B)를 압축하면 outputs[0]은 fileName 'photo_compressed.jpg', mimeType 'image/jpeg', sizeBytes ≤ 512000, note undefined이고, navigate('/result', { state: { jobId } })가 호출된다",
+        "F3-AC-6: 0개면 '용량을 줄일 이미지를 선택해주세요'가 보이고 '압축하기'는 disabled. 3개 중 1개가 끝나면 '1/3 압축 중'이 보이고 Button은 loading",
+        "F3-AC-8: 목표 1MB로 IMG_1.heic를 압축하면 heic2any가 toType 'image/jpeg'로 1회 호출되고, fileName은 'IMG_1_compressed.jpg', sizeBytes ≤ 1048576, prefs.compressTargetKB === 1024",
+        "F3-AC-9: append가 { ok: false }이고 MemoryRouter에 Result를 함께 등록하면 navigate가 historySaveFailed: true로 1회 호출된다. /result에서 Toast 1회, output-row 1개의 '저장'이 enabled",
+        "F3-AC-4/AC-11: TARGET_NOT_REACHED(626,688B) 결과의 /result 행 부제에 '(최소 612KB)'가 보인다. sticker.webp(204,800B)를 500KB로 압축하면 /result에서 'sticker_compressed.webp' 행의 '저장'이 deliverFile을 mimeType 'image/webp'로 호출한다"
+      ]
+    },
+    "covers": [
+      "F3-AC-1",
+      "F3-AC-3",
+      "F3-AC-4",
+      "F3-AC-6",
+      "F3-AC-8",
+      "F3-AC-9",
+      "F3-AC-11"
+    ],
+    "files": [
+      "src/pages/Compress.tsx",
+      "src/pages/Compress.test.tsx"
+    ],
+    "definition_of_done": [
+      "Compress.test.tsx에서 5개 AC 통과(canvas·heic2any는 mock)",
+      "'압축하기'에 success 햅틱",
+      "TextField 여백을 덮어쓰지 않는다",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0007",
+      "0008",
+      "0012"
+    ],
+    "db_schema": "ConvertPrefs.compressTargetKB → 'fileconvertkr:prefs:v1' / JobOptions { tool: 'compress'; targetBytes: 51200~10485760 }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA. <ScreenScaffold><Top title={<Top.TitleParagraph>이미지 용량 줄이기</Top.TitleParagraph>} /><Spacing size={8}/><Paragraph.Text typography=\"t6\" color=\"secondary\">원하는 용량으로 압축</Paragraph.Text><Spacing size={24}/><TargetSizeSelector disabled={running}/><Spacing size={24}/><FilePickSection tool=\"compress\"/><Spacing size={16}/>{0개 ? Paragraph.Text '용량을 줄일 이미지를 선택해주세요' : SelectedFileList}<Spacing size={80}/><SubmitFooter><Button display=\"block\" loading={running} disabled={!target || files.length===0}>압축하기</Button> + 'k/n 압축 중'</SubmitFooter></ScreenScaffold>. Toast position=\"top\". 직접 입력 필드는 KeyboardAwareTextField(inputMode numeric)로 키보드에 가리지 않게 한다."
+  },
+  {
+    "id": "0015",
+    "title": "PDF 합치기 화면 /pdf/merge",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/PdfMerge.tsx: FilePickSection(tool pdf-merge)으로 파일을 추가하면 readPdfPageCount로 페이지 수를 읽는다. 읽는 동안 부제는 '페이지 확인 중'이다. 암호 PDF는 Toast를 띄우고 목록에서 뺀다. 순서 변경은 MergeFileList로 한다. '합치기'는 runSingle(mergePdfs)을 실행하고, fileName '합친문서_YYYYMMDD_HHmm.pdf'로 finishJob을 호출한다. 2개 미만이면 버튼을 비활성화한다.",
+      "acceptance_criteria": [
+        "F4-AC-1: [a(3p), b(2p)]를 2026-09-24 14:30에 합치면 fileName '합친문서_20260924_1430.pdf', mimeType 'application/pdf', pageCount 5이고, navigate('/result', { state: { jobId } })가 호출된다",
+        "F4-AC-2: a.pdf 행의 '아래로'를 탭하면 목록이 [b, a]가 되고 순번은 b '1', a '2'. mergePdfs는 [b, a] 순서로 호출된다",
+        "F4-AC-3/AC-6: 1개면 '합치기'가 disabled이고 '2개 이상 선택해주세요'가 보인다. 0개면 '합칠 PDF 파일을 2개 이상 선택해주세요'. 합치는 동안 Button은 loading이고 '문서 합치는 중'이 보인다",
+        "F4-AC-4/AC-5: secret.pdf 페이지 수 읽기가 ENCRYPTED로 실패하면 Toast '암호가 걸린 PDF는 합칠 수 없어요: secret.pdf'가 뜨고 목록에는 a.pdf만 남는다. 84MB가 선택된 상태에서 28MB를 추가하면 Toast '전체 용량은 최대 100MB까지 가능해요'가 뜨고 목록은 3개 그대로",
+        "F4-AC-8: append가 { ok: false }이고 MemoryRouter에 Result를 함께 등록하면 navigate가 historySaveFailed: true로 1회 호출되고 getJob(jobId).outputs[0].pageCount === 5. /result에서 Toast 1회, '저장' enabled"
+      ]
+    },
+    "covers": [
+      "F4-AC-1",
+      "F4-AC-2",
+      "F4-AC-3",
+      "F4-AC-4",
+      "F4-AC-5",
+      "F4-AC-6",
+      "F4-AC-8"
+    ],
+    "files": [
+      "src/pages/PdfMerge.tsx",
+      "src/pages/PdfMerge.test.tsx"
+    ],
+    "definition_of_done": [
+      "PdfMerge.test.tsx에서 5개 AC 통과(pdf-lib는 테스트 PDF 또는 mock)",
+      "출력 sourceName은 첫 파일명, sourceSizeBytes는 입력 합계",
+      "'합치기'에 success 햅틱",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0007",
+      "0012"
+    ],
+    "db_schema": "JobOptions { tool: 'pdf-merge' } / InputFileMeta.pageCount",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA. <ScreenScaffold><Top title={<Top.TitleParagraph>PDF 합치기</Top.TitleParagraph>} /><Spacing size={8}/><Paragraph.Text typography=\"t6\" color=\"secondary\">여러 PDF를 하나로</Paragraph.Text><Spacing size={24}/><FilePickSection tool=\"pdf-merge\"/><Spacing size={16}/>{0개 ? '합칠 PDF 파일을 2개 이상 선택해주세요' : <MergeFileList/>}{1개면 Paragraph.Text '2개 이상 선택해주세요'}<Spacing size={80}/><SubmitFooter><Button display=\"block\" loading={running} disabled={files.length<2 || 페이지 확인 중}>합치기</Button> + '문서 합치는 중'</SubmitFooter></ScreenScaffold>. 위로/아래로/삭제 버튼은 44px 이상, 탭 시 tickWeak. Toast position=\"top\"."
+  },
+  {
+    "id": "0016",
+    "title": "PDF → 이미지 화면 /pdf/to-image",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/PdfToImage.tsx: PdfSingleFilePicker, 형식 Chip(JPG/PNG, prefs.pdfImageFormat), 화질 Chip(보통=1.5 / 2, prefs.pdfImageScale), 페이지 Chip('전체'/'범위 지정')과 KeyboardAwareTextField로 구성한다. parsePageRanges로 검증하고, 50페이지를 넘으면 막는다. renderPageToBlob으로 '{base}_p{n}.jpg|png'를 만들고 finishJob을 호출한다.",
+      "acceptance_criteria": [
+        "F5-AC-1: 계약서.pdf(3p), JPG, 보통, 전체로 변환하면 fileName은 ['계약서_p1.jpg','계약서_p2.jpg','계약서_p3.jpg']이고, 모두 'image/jpeg', getViewport({ scale: 1.5 })를 쓰며, navigate('/result', { state: { jobId } })가 호출된다",
+        "F5-AC-2/AC-4: 6p report.pdf에서 '1-2, 5'를 입력하면 결과는 ['report_p1.jpg','report_p2.jpg','report_p5.jpg']. '3-1', '0', 'a', '1--2'는 helperText '페이지 범위를 확인해주세요 (예: 1-3, 5)'이고 버튼은 disabled. '8'은 범위 초과 문구와 함께 disabled",
+        "F5-AC-5: 80p 문서에서 '전체'를 고르면 helperText '한 번에 최대 50페이지까지 변환할 수 있어요. 범위를 지정해주세요'가 보이고 '이미지로 변환'은 disabled",
+        "F5-AC-7: 선택 전에는 '이미지로 바꿀 PDF를 선택해주세요'가 보이고 버튼은 disabled. 12페이지 중 3페이지를 렌더한 시점에는 '3/12 페이지 변환 중'",
+        "F5-AC-9: append가 { ok: false }이고 MemoryRouter에 Result를 함께 등록하면 navigate가 historySaveFailed: true로 1회 호출되고 outputs.length === 3. /result에서 Toast 1회, output-row 3개의 '저장'이 모두 enabled"
+      ]
+    },
+    "covers": [
+      "F5-AC-1",
+      "F5-AC-2",
+      "F5-AC-4",
+      "F5-AC-5",
+      "F5-AC-6",
+      "F5-AC-7",
+      "F5-AC-9"
+    ],
+    "files": [
+      "src/pages/PdfToImage.tsx",
+      "src/pages/PdfToImage.test.tsx"
+    ],
+    "definition_of_done": [
+      "PdfToImage.test.tsx에서 5개 AC 통과(pdfjs mock)",
+      "범위 초과 문구는 SPEC F5 AC-4 원문을 따른다(F6와 같은 '문서는 총 N페이지예요' 형식)",
+      "범위 입력은 KeyboardAwareTextField(scrollIntoView center, enterKeyHint done)",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0007",
+      "0008",
+      "0012"
+    ],
+    "db_schema": "ConvertPrefs.pdfImageFormat / pdfImageScale → 'fileconvertkr:prefs:v1' / JobOptions { tool: 'pdf-to-image'; format; scale: 1.5|2; pages: number[] (1~50) }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA. <ScreenScaffold><Top title={<Top.TitleParagraph>PDF → 이미지</Top.TitleParagraph>} /><Spacing size={8}/><Paragraph.Text typography=\"t6\" color=\"secondary\">페이지를 사진으로 저장</Paragraph.Text><Spacing size={24}/><PdfSingleFilePicker tool=\"pdf-to-image\"/>{미선택 ? '이미지로 바꿀 PDF를 선택해주세요' : ListRow(파일명·N페이지)}<Spacing size={24}/>형식 Chip 그룹(JPG/PNG) → Spacing 24 → 화질 Chip 그룹(scale 1.5/2) → Spacing 24 → 페이지 Chip 그룹('전체'/'범위 지정') → 범위 지정이면 KeyboardAwareTextField(placeholder '1-3, 5', hasError, helperText)<Spacing size={80}/><SubmitFooter><Button display=\"block\" loading={running}>이미지로 변환</Button> + 'k/N 페이지 변환 중'</SubmitFooter></ScreenScaffold>. Chip 그룹은 <div style={{display:'flex',gap:8}}>, 실행 중에는 disabled. Toast position=\"top\"."
+  },
+  {
+    "id": "0017",
+    "title": "PDF 나누기 화면 /pdf/split",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "src/pages/PdfSplit.tsx: PdfSingleFilePicker, 모드 Chip('페이지마다'/'범위로'), 범위 입력 KeyboardAwareTextField, 미리보기 'N개 파일로 나눠요'로 구성한다. 1페이지 문서, 결과 50개 초과, 잘못된 범위, 범위 초과를 막는다. splitPdf 진행률은 'k/n 파일 만드는 중'으로 보여주고, 끝나면 finishJob을 호출한다.",
+      "acceptance_criteria": [
+        "F6-AC-1/AC-9: 보고서.pdf(4p)를 '페이지마다'로 나누면 ['보고서_p1.pdf'..'보고서_p4.pdf']이고 모두 pageCount 1, navigate('/result', { state: { jobId } })가 호출된다. 12p면 '보고서_p01.pdf'~'보고서_p12.pdf'이고, 이름을 정렬해도 순서가 같다",
+        "F6-AC-2/AC-3: '범위로'에서 '1-2, 3'을 입력하면 미리보기 '2개 파일로 나눠요'가 보이고 결과는 [보고서_1-2.pdf(2p), 보고서_p3.pdf(1p)]. '2-1'은 '페이지 범위를 확인해주세요 (예: 1-3, 5)', '1-6'은 '문서는 총 4페이지예요'이고 둘 다 '나누기'가 disabled",
+        "F6-AC-4/AC-5: 1p 문서를 '페이지마다'로 하면 '1페이지 문서는 나눌 수 없어요', 80p 문서는 '한 번에 최대 50개 파일로 나눌 수 있어요. 범위로 나눠주세요'가 보이고 둘 다 disabled",
+        "F6-AC-6/AC-7: 미선택이면 '나눌 PDF를 선택해주세요'가 보이고 disabled. 3개 중 2개를 만든 시점에는 '2/3 파일 만드는 중'과 loading. 범위 필드는 focus 시 scrollIntoView({ block: 'center' }), enterKeyHint 'done', Enter를 누르면 blur",
+        "F6-AC-8: append가 { ok: false }이고 MemoryRouter에 Result를 함께 등록하면 navigate가 historySaveFailed: true로 1회 호출되고 outputs.length === 4. /result에서 Toast 1회, output-row 4개의 '저장'이 모두 enabled"
+      ]
+    },
+    "covers": [
+      "F6-AC-1",
+      "F6-AC-2",
+      "F6-AC-3",
+      "F6-AC-4",
+      "F6-AC-5",
+      "F6-AC-6",
+      "F6-AC-7",
+      "F6-AC-8",
+      "F6-AC-9"
+    ],
+    "files": [
+      "src/pages/PdfSplit.tsx",
+      "src/pages/PdfSplit.test.tsx"
+    ],
+    "definition_of_done": [
+      "PdfSplit.test.tsx에서 5개 AC 통과",
+      "파일명 규칙은 src/lib/pdf/pageRanges.ts의 함수를 그대로 사용",
+      "'나누기'에 success 햅틱, 모드 Chip에 tickWeak",
+      "tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [
+      "0007",
+      "0008",
+      "0012"
+    ],
+    "db_schema": "JobOptions { tool: 'pdf-split'; mode: 'each'|'ranges'; groups: { start; end }[] (1~50) }",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FixedBottomCTA. <ScreenScaffold><Top title={<Top.TitleParagraph>PDF 나누기</Top.TitleParagraph>} /><Spacing size={8}/><Paragraph.Text typography=\"t6\" color=\"secondary\">페이지별·범위별로 분할</Paragraph.Text><Spacing size={24}/><PdfSingleFilePicker tool=\"pdf-split\"/>{미선택 ? '나눌 PDF를 선택해주세요' : ListRow(파일명·N페이지)}<Spacing size={24}/>모드 Chip 그룹('페이지마다'/'범위로', <div style={{display:'flex',gap:8}}>) → '범위로'면 Spacing 12 + KeyboardAwareTextField(label '나눌 범위', hasError, helperText) → Paragraph.Text 미리보기 'N개 파일로 나눠요' 또는 helperText 오류<Spacing size={80}/><SubmitFooter><Button display=\"block\" loading={running}>나누기</Button> + 'k/n 파일 만드는 중'</SubmitFooter></ScreenScaffold>. Toast position=\"top\"."
+  },
+  {
+    "id": "0018",
+    "title": "변환 이력 화면 /history",
+    "epic": "Epic 3: UI Pages",
+    "task": {
+      "description": "[부가] src/pages/History.tsx는 마운트 시 historyRepo.load()를 1회 호출한다. HistorySummary(7일 합계 SummaryHero, 기록이 있는 날이 2일 이상이면 Sparkline), HistoryList(history-row, 최대 100행, 페이지네이션 없음), 빈 상태, HistoryDetailSheet(파일명 목록 + '외 N개', 재변환), 전체 삭제 AlertDialog로 구성한다.",
+      "acceptance_criteria": [
+        "F8-AC-2: Asia/Seoul에서 history-row 2개가 최신순이고, 첫 행 제목은 'HEIC → JPG/PNG · 파일 3개', 부제는 '2026.09.24 14:30 · 7.0MB → 4.0MB'",
+        "F8-AC-3/AC-6: 0개이거나 값이 '{broken'이면 Asset.ContentIcon, '아직 변환한 파일이 없어요', '파일 변환하러 가기'(누르면 navigate('/'))만 보이고, '전체 삭제'와 history-summary는 0개. console.error 0회",
+        "F8-AC-4/AC-9: pdf-merge 행을 탭하면 BottomSheet에 원본·결과 파일명과 안내 문구 '앱은 변환한 파일을 보관하지 않아요. 저장한 파일은 사진 앱 또는 파일 앱에서 확인해주세요'가 보인다. inputCount 7에 이름이 5개면 f1~f5 뒤에 '외 2개'. '같은 도구로 다시 변환'을 누르면 logClick('history_rerun') 다음 navigate('/pdf/merge')",
+        "F8-AC-5: '전체 삭제'를 누르면 AlertDialog '변환 이력을 모두 삭제할까요?'가 '삭제'/'취소' 버튼과 함께 뜬다. '삭제'를 누르면 getItem('fileconvertkr:history:v1') === null이고 빈 상태가 보인다. '취소'를 누르면 3행이 유지된다",
+        "F8-AC-8/AC-10: 최근 7일 중 2일의 outputCount가 3과 5면 SummaryHero는 8과 '개'이고 길이 7 Sparkline이 보인다(기록 있는 날이 1일이면 Sparkline 없음). 100개면 history-row 100개이고 마지막은 'e-99'. 이력 키 getItem은 마운트당 1회, 목록 안 <img>와 '더 보기'는 0개"
+      ]
+    },
+    "covers": [
+      "F8-AC-2",
+      "F8-AC-3",
+      "F8-AC-4",
+      "F8-AC-5",
+      "F8-AC-6",
+      "F8-AC-8",
+      "F8-AC-9",
+      "F8-AC-10"
+    ],
+    "files": [
+      "src/pages/History.tsx",
+      "src/components/history/HistorySummary.tsx",
+      "src/components/history/HistoryList.tsx",
+      "src/components/history/HistoryDetailSheet.tsx",
+      "src/pages/History.test.tsx"
+    ],
+    "definition_of_done": [
+      "History.test.tsx에서 5개 AC 통과",
+      "빈 상태 UI는 History.tsx 안에 둔다(별도 파일 없음)",
+      "AlertDialog 버튼 문구는 SPEC F8 AC-5 원문('삭제'/'취소')을 따른다",
+      "HEX 색상 0건, tsc --noEmit 오류 0건"
+    ],
+    "depends_on": [],
+    "db_schema": "HistoryEntry[] ← localStorage 'fileconvertkr:history:v1' (historyRepo.load / clear)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: Top+우측액션\nTDS Components (whitelist): ScreenScaffold, Top, Button, Card, SummaryHero, Amount, Sparkline, Paragraph, Spacing, ListRow, BottomSheet, AlertDialog, EmptyState, Asset.ContentIcon, FloatingTabBar\nLayout:\n<ScreenScaffold>\n  <Top title={<Top.TitleParagraph>변환 이력</Top.TitleParagraph>}\n    right={entries.length > 0 && <Button variant=\"weak\" size=\"small\" onClick={openConfirm}>전체 삭제</Button>} />\n  <Spacing size={16} />\n  <div data-testid=\"history-summary\"><Card>\n    <SummaryHero label=\"총 변환 파일\" value={<Amount value={sumOutputCount} unit=\"개\" typography=\"t1\" />} />\n    {activeDaysIn7 >= 2 && <Sparkline data={daily7} />}          {/* 길이 7, 기록 없는 날은 0 */}\n  </Card></div>\n  <Spacing size={24} />\n  <Paragraph.Text typography=\"t5\">최근 변환</Paragraph.Text>\n  <Spacing size={12} />\n  {entries.map(e => (                                            {/* 최대 100행, 페이지네이션 없음 */}\n    <ListRow key={e.id} data-testid=\"history-row\" onClick={() => setSelected(e)}\n      contents={<ListRow.Texts type=\"2RowTypeA\"\n        top={`${toolMeta[e.tool].title} · 파일 ${e.inputCount}개`}\n        bottom={`${fmtDate(e.createdAt)} · ${formatBytes(e.inputTotalBytes)} → ${formatBytes(e.outputTotalBytes)}${e.status === 'partial' ? ` · 실패 ${e.failedCount}개` : ''}`} />} />\n  ))}\n  <Spacing size={80} />\n  <FloatingTabBar /* 활성 탭: 이력 */ />\n  <BottomSheet open={!!selected} onClose={() => setSelected(null)}>\n    원본 파일명 목록: inputNames + (inputCount > inputNames.length ? `외 ${차이}개` : '')\n    결과 파일명 목록: outputNames에 같은 규칙\n    <Paragraph.Text typography=\"t7\" color=\"secondary\">앱은 변환한 파일을 보관하지 않아요. 저장한 파일은 사진 앱 또는 파일 앱에서 확인해주세요</Paragraph.Text>\n    <Button variant=\"fill\" size=\"large\" display=\"block\">같은 도구로 다시 변환</Button>\n  </BottomSheet>\n  <AlertDialog open={confirmOpen} title=\"변환 이력을 모두 삭제할까요?\" alertButton={'삭제' + '취소'} onClose={closeConfirm} />\n</ScreenScaffold>\nStates:\n- Loading: 없음. historyRepo.load()는 마운트할 때 동기로 1회만 호출해요.\n- Empty: <Asset.ContentIcon /> + <EmptyState title=\"아직 변환한 파일이 없어요\" action={<Button variant=\"weak\">파일 변환하러 가기</Button>} />. 이때 '전체 삭제'와 history-summary는 렌더하지 않아요.\n- Error: 저장된 데이터가 손상됐으면 Empty와 같게 처리하고, console.error는 0회예요.\nInteractions:\n- 행을 탭하면 tickWeak 후 BottomSheet가 열려요.\n- '같은 도구로 다시 변환'을 누르면 success → logClick('history_rerun') → navigate(TOOL_ROUTES[tool]) 순서로 실행해요.\n- '전체 삭제'를 누르면 tickWeak 후 AlertDialog가 열려요. '삭제'를 누르면 tickStrong → historyRepo.clear() → Empty 화면이에요.\n- '파일 변환하러 가기'를 누르면 navigate('/')로 가요."
+  },
+  {
+    "id": "0019",
+    "title": "라우팅 연결 src/App.tsx (진입점 단일 소유)",
+    "epic": "4",
+    "task": {
+      "description": "src/App.tsx에 8개 라우트를 등록한다: / → Home, /history → History, /convert/heic → Heic, /convert/compress → Compress, /pdf/merge → PdfMerge, /pdf/to-image → PdfToImage, /pdf/split → PdfSplit, /result → Result. 알 수 없는 경로는 Navigate로 /에 보낸다. 템플릿의 전역 Provider(TDS·광고 등)가 있으면 유지하고 여기서 배선한다. main.tsx는 수정하지 않는다. App.tsx를 수정하는 패킷은 이것 하나다.",
+      "acceptance_criteria": [
+        "MemoryRouter initialEntries=['/']에서 ListRow 'HEIC → JPG/PNG'가 렌더되고, 탭하면 URL이 /convert/heic로 바뀌어 Top 'HEIC → JPG/PNG'가 보인다",
+        "8개 경로 각각으로 진입하면 해당 화면의 Top 제목이 렌더되고 console.error는 0회",
+        "F7-AC-5 통합: state 없이 '/result'로 직접 진입하면 '변환 결과가 만료됐어요'와 '처음으로'만 보이고, 누르면 '/'로 replace 이동한다",
+        "'/unknown'으로 진입하면 '/' 홈이 렌더된다"
+      ]
+    },
+    "covers": [
+      "F8-AC-1",
+      "F7-AC-5"
+    ],
+    "files": [
+      "src/App.tsx",
+      "src/App.test.tsx"
+    ],
+    "definition_of_done": [
+      "App.test.tsx에서 4개 AC 통과",
+      "npm run build 성공, tsc --noEmit 오류 0건",
+      "src/main.tsx 변경 0줄(@AI:ANCHOR)",
+      "heic2any·pdf-lib·pdfjs-dist가 홈 진입 청크에 포함되지 않는다(dynamic import 유지)"
+    ],
+    "depends_on": [
+      "0011",
+      "0012",
+      "0013",
+      "0014",
+      "0015",
+      "0016",
+      "0017",
+      "0018"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "react-router-dom <Routes>로 8개 Route와 <Route path=\"*\" element={<Navigate to=\"/\" replace />} />를 둔다. 하단 탭(FloatingTabBar)은 Home·History 화면이 각자 렌더한다(App에서 중복 렌더 금지). 템플릿 기존 Provider 구조는 유지한다."
+  },
+  {
+    "id": "0020",
+    "title": "검수 정적 검사 스위트·잠정 게이트 테스트·최종 폴리시",
+    "epic": "Epic 4: Integration",
+    "task": {
+      "description": "compliance.test.ts는 소스 전체를 정적으로 검사한다: HEX 색상, window.open, 외부 location.href, 설치 유도 문구, 외부 분석 SDK, pdfjs 비-legacy import, build.target. 잠정 AC(F7 AC-10, AC-13)를 Result 브라우저 테스트로 작성한다. 템플릿 TossRewardAd의 실제 동작(OQ7)은 docs에 기록한다. App.tsx와 main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "F7-AC-8: src/**/*.{ts,tsx,css}에서 /#[0-9a-fA-F]{3,8}\\b/ 패턴이 CSS·style 값에 0건, 'window.open(' 0건, http(s)://로 시작하는 location.href 대입 0건",
+        "F8-AC-7: package.json과 src 소스에 gtag, analytics, amplitude, mixpanel, firebase 문자열이 0건이고, 화면 문구 소스에 '설치', '다운로드', 'App Store', 'Play 스토어'가 0건",
+        "F5-AC-8: src에서 pdfjs-dist import는 모두 'pdfjs-dist/legacy/'로 시작하고, vite.config.ts에는 build.target ['es2019','safari16']이 있다",
+        "F7-AC-13 [잠정·OQ7]: test-slot, 로드 성공 mock, 대기형 show mock에서 locked-gate 안의 button은 정확히 1개이고 크기는 44×44 이상이다. 탭하면 showFullScreenAd가 1회 호출되고, 보상 완료 후 locked-tier가 나타나며 logImpression('result_locked_tier')이 1회 호출된다",
+        "F7-AC-10 [잠정·OQ7]: 보상 없이 닫히면 locked-tier는 0개이고 locked-teaser는 유지되며, 버튼이 다시 enabled가 된다. Toast는 0회이고 output-row '저장' 3개는 enabled. 다시 탭하면 showFullScreenAd 누적 2회"
+      ]
+    },
+    "covers": [
+      "F7-AC-8",
+      "F8-AC-7",
+      "F5-AC-8",
+      "F7-AC-10",
+      "F7-AC-13"
+    ],
+    "files": [
+      "src/test/compliance.test.ts",
+      "src/pages/Result.provisional.browser.test.tsx",
+      "docs/oq7-tossrewardad.md"
+    ],
+    "definition_of_done": [
+      "compliance.test.ts가 통과한다(위반이 있으면 해당 소스를 고치지 말고 실패 목록을 보고한다)",
+      "잠정 AC 테스트는 실패해도 릴리스를 막지 않는다는 점과 확인 결과를 docs/oq7-tossrewardad.md에 기록",
+      "src/App.tsx·src/main.tsx 변경 0줄",
+      "npm run build 성공"
+    ],
+    "depends_on": [
+      "0012"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "UI 파일은 새로 만들지 않는다. 검사 대상 규칙: 색상은 var(--tds-color-*)만, 외부 링크·설치 유도 금지, 광고는 앱인토스 광고(템플릿 AdSlot/TossRewardAd)만, 리워드 게이트는 결과의 더 깊은 층(locked-tier)만 감싼다."
+  }
+]
