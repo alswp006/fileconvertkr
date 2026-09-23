@@ -182,6 +182,7 @@ export type ResultRouteState = {
   lib/
     analytics.ts
     contract.ts
+    convert/
     deliverFile.ts
     finishJob.ts
     jobStore.ts
@@ -208,12 +209,16 @@ export type ResultRouteState = {
   styles/
     globals.css
     reward-ad.css
+  test/
+    setup.ts
   types/
   vite-env.d.ts
 
 ### Exports (src/lib/)
 - analytics.ts: export type LogFields = Record<string, string | number | boolean | null>; export const DWELL_MS = 3000; export function fireAndForget(call: () => unknown): void; export function logScreen(page: string, extra?: LogFields): void; export function logClick(name: string, extra?: LogFields): void; export function logImpression(name: string, extra?: LogFields): void; export function useScreenLog(page: string): void
 - contract.ts: export type Job =; export type ConversionResult =; export type ToolType = 'heic-convert' | 'image-compress' | 'pdf-merge' | 'pdf-split' | 'pdf-to-image'; export type runJobFn = (job: Job, converters: Record<ToolType, (files: Blob[], opts: any) => Promise<Blob[]>>) => Promis; export type useConversionRunnerFn = () =>; export type historyRepoFn =; export type prefsStoreFn =; export type compressToTargetFn = (blob: Blob, targetKb: number, options?:
+- convert/heic.ts: export interface ConversionResult; export function isHeic(file: File): boolean; export async function convertHeic( file: File, format: 'jpg' | 'png', ): Promise<ConversionResult>; export async function decodeHeicToJpeg(blob: Blob): Promise<Blob>; export async function heicToJpeg(blob: Blob, quality = 0.92): Promise<Blob>
+- convert/imageSize.ts: export interface ImageDimensions; export async function getImageSize(blob: Blob): Promise<ImageDimensions>
 - deliverFile.ts: export async function deliverFile(output: ConversionOutput): Promise<void>
 - finishJob.ts: export async function finishJob( job: ConversionJob, navigate: NavigateFunction ): Promise<void>
 - jobStore.ts: export const jobStore =
@@ -252,80 +257,4 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0002: 저장소: validateFiles·prefs·historyRepo·jobStore (files: src/lib/validateFiles.ts, src/lib/storage/prefs.ts, src/lib/storage/historyRepo.ts, src/lib/jobStore.ts, src/lib/storage/storage.test.ts)
-
-## Available exports from existing files
-// src/App.tsx
-export default function App() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/hooks/useConversionRunner.ts
-export function useConversionRunner() {
-
-// src/lib/analytics.ts
-export type LogFields = Record<string, string | number | boolean | null>;
-export const DWELL_MS = 3000;
-export function fireAndForget(call: () => unknown): void {
-export function logScreen(page: string, extra?: LogFields): void {
-export function logClick(name: string, extra?: LogFields): void {
-export function logImpression(name: string, extra?: LogFields): void {
-export function useScreenLog(page: string): void {
-
-// src/lib/contract.ts
-export type Job = { id: string; toolType: ToolType; status: 'pending' | 'processing' | 'done' | 'error'; createdAt: number; inputFiles: { name: string; size: number; blob: Blob }[]; progress?: number; error?: string };
-export type ConversionResult = { jobId: string; files: { name: string; size: number; url: string; mimeType: string 
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(4), general(13), testing(2), ui(3)
-
-Key lessons (verify against actual code before applying):
-- [general] 파일 생성 전 디렉토리 구조 확인 — mkdir -p로 경로 보장 (60% · 타 앱 1회 — 맹신 금지)
-- [general] 화면·라우팅 등 소비자 모듈은 그것이 import하는 생산자 모듈이 병합된 뒤에만 병합하고, 순서를 지킬 수 없으면 소비자 병합과 동시에 최소 플레이스홀더를 만들어 매 병합 직후 타입체크와 빌드가 항상 통과하도록 유지하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 전역 라우팅·탭바·Provider 배선은 개별 화면보다 먼저(초반 20% 안에) 완료하고 미구현 화면은 스텁 라우트로 연결해, 시간 예산이 소진돼도 앱이 항상 실행 가능한 상태를 유지하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 저장·데이터 접근 등 기반 계층 패킷은 이를 import 하는 화면 패킷보다 반드시 먼저 완료·병합하고, 미완료면 상위 화면 패킷 병합을 차단하라 — 빈 기반 모듈 하나가 전 라우트 스모크를 무너뜨린다. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 외부에서 들어온 모든 값(라우터 state, 로컬 저장소, 부분 입력 폼)은 사용 직전에 배열·객체 기본값으로 정규화하고, 테이블/맵 조회 결과는 존재 확인 후에만 하위 속성이나 length에 접근하라. (60% · 타 앱 1회 — 맹신 금지)
+- 0004: 빌드 설정·변환 라이브러리 설치·HEIC 변환기 (files: package.json, vite.config.ts, src/test/setup.ts, src/lib/convert/heic.ts, src/lib/convert/imageSize.ts)
