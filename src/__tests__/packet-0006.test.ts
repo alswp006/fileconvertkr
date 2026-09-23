@@ -188,8 +188,8 @@ describe("PDF 엔진: 범위 파서·합치기·나누기·렌더러", () => {
 
         // Act: merge
         const result = await mergePdfs([
-          new Blob([bytesA], { type: "application/pdf" }),
-          new Blob([bytesB], { type: "application/pdf" }),
+          new Blob([new Uint8Array(bytesA)], { type: "application/pdf" }),
+          new Blob([new Uint8Array(bytesB)], { type: "application/pdf" }),
         ]);
 
         // Assert
