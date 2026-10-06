@@ -16,6 +16,8 @@ const ROUTES: { path: string; name: string }[] = [
   { path: "/convert/heic", name: "heic" },
   { path: "/convert/compress", name: "compress" },
   { path: "/pdf/merge", name: "pdf-merge" },
+  { path: "/pdf/to-image", name: "pdf-to-image" },
+  { path: "/pdf/split", name: "pdf-split" },
   // { path: "/settings", name: "settings" },
 ];
 

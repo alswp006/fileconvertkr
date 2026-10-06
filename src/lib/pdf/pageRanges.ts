@@ -93,3 +93,8 @@ export function generateSplitFilenames(baseName: string, groups: RangeGroup[], t
 export function generateSplitPageCounts(groups: RangeGroup[]): number[] {
   return groups.map((group) => group.end - group.start + 1);
 }
+
+/** F5: 원본 총 페이지 수 기준 자릿수로 0을 채운 페이지 번호 */
+export function formatPageNumber(n: number, totalPages: number): string {
+  return String(n).padStart(String(totalPages).length, '0');
+}
