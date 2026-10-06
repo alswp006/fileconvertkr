@@ -157,9 +157,22 @@ export function mockTds() {
       React.createElement("div", { "data-slot": "bottom-cta" }, children),
 
     BottomSheet: Object.assign(
-      ({ children, open }: any) =>
-        open ? React.createElement("div", { role: "dialog" }, children) : null,
-      { Header: ({ children }: any) => React.createElement("div", null, children) },
+      // 벤더 모양: header / children(본문) / cta 슬롯을 따로 렌더한다.
+      ({ children, open, header, cta }: any) =>
+        open
+          ? React.createElement(
+              "div",
+              { role: "dialog" },
+              React.createElement("div", { "data-slot": "header" }, header),
+              React.createElement("div", { "data-slot": "body" }, children),
+              React.createElement("div", { "data-slot": "cta" }, cta),
+            )
+          : null,
+      {
+        Header: ({ children }: any) => React.createElement("h2", null, children),
+        CTA: ({ children, onClick }: any) =>
+          React.createElement("button", { onClick }, children),
+      },
     ),
 
     // 실제 @toss/tds-mobile은 Chip(그룹 컨테이너, div) + ChipItem(개별 선택 버튼)으로 분리돼

@@ -1,4 +1,4 @@
-import { BottomSheet, Button, Paragraph, Spacing } from "@toss/tds-mobile";
+import { BottomSheet, Paragraph, Spacing } from "@toss/tds-mobile";
 import type { HistoryEntry } from "@/lib/types";
 
 function NameList({ names, count }: { names: string[]; count: number }) {
@@ -28,24 +28,27 @@ export function HistoryDetailSheet({
   onRerun: (entry: HistoryEntry) => void;
 }) {
   return (
-    <BottomSheet open={!!entry} onClose={onClose}>
+    <BottomSheet
+      open={!!entry}
+      onClose={onClose}
+      header={<BottomSheet.Header>원본 파일</BottomSheet.Header>}
+      cta={
+        <BottomSheet.CTA onClick={() => entry && onRerun(entry)}>
+          같은 도구로 다시 변환
+        </BottomSheet.CTA>
+      }
+    >
       {entry && (
         <>
-          <Paragraph.Text typography="t5">원본 파일</Paragraph.Text>
-          <Spacing size={8} />
           <NameList names={entry.inputNames} count={entry.inputCount} />
           <Spacing size={16} />
-          <Paragraph.Text typography="t5">결과 파일</Paragraph.Text>
+          <Paragraph.Text typography="st10">결과 {entry.outputCount}개</Paragraph.Text>
           <Spacing size={8} />
           <NameList names={entry.outputNames} count={entry.outputCount} />
           <Spacing size={16} />
           <Paragraph.Text typography="st13">
             앱은 변환한 파일을 보관하지 않아요. 저장한 파일은 사진 앱 또는 파일 앱에서 확인해주세요
           </Paragraph.Text>
-          <Spacing size={16} />
-          <Button variant="fill" size="large" display="block" onClick={() => onRerun(entry)}>
-            같은 도구로 다시 변환
-          </Button>
         </>
       )}
     </BottomSheet>

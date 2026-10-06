@@ -285,6 +285,7 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - heal-1-01: 진입점 라우팅 배선 + 미작성 페이지 플레이스홀더(단독 tsc·빌드 통과) (files: src/App.tsx, src/App.test.tsx, src/pages/Heic.tsx, src/pages/Compress.tsx, src/pages/PdfMerge.tsx, src/pages/PdfToImage.tsx, src/pages/PdfSplit.tsx)
 - heal-1-03: 검수 차단 요소 제거: console.error·HEX 색상 (files: src/lib/convert/canvasEncode.ts)
 - imp-20261007-01: [개선] 갈 수 없는 화면 6개에 진입점 만들기 (files: src/pages/Home.tsx, src/pages/Compress.tsx, src/pages/Heic.tsx)
+- imp-20261007-02: [개선] 눌러도 아무 일 없는 상호작용 1곳 구현 (files: src/hooks/useConversionRunner.ts)
 
 ## Available exports from existing files
 // src/App.tsx
