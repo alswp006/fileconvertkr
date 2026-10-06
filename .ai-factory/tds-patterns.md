@@ -51,11 +51,12 @@ import { useState } from 'react';
 
 export function HeaderWithSettings() {
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
 
   return (
     <>
       <Top
-        title={<Top.TitleParagraph>PAGE_TITLE</Top.TitleParagraph>}
+        title={<Top.TitleParagraph>페이지 제목</Top.TitleParagraph>}
         right={
           <IconButton
             aria-label="설정"
@@ -64,15 +65,20 @@ export function HeaderWithSettings() {
           />
         }
       />
-      <BottomSheet open={open} onClose={() => setOpen(false)} title="설정">
-        {/* content */}
+      <BottomSheet
+        open={open}
+        onClose={close}
+        header={<BottomSheet.Header>설정</BottomSheet.Header>}
+        cta={<BottomSheet.CTA onClick={close}>확인</BottomSheet.CTA>}
+      >
+        {/* 본문만 — 제목·버튼은 header/cta 슬롯에 */}
       </BottomSheet>
     </>
   );
 }
 ```
 
-**핵심**: Top의 `right` prop, IconButton의 `aria-label` 필수 (접근성), BottomSheet의 `open + onClose` 직접 관리.
+**핵심**: Top의 `right` prop, IconButton의 `aria-label` 필수 (접근성), BottomSheet의 `open + onClose` 직접 관리. BottomSheet에 **`title` prop은 없다** — 제목은 `header`(`BottomSheet.Header`), 버튼은 `cta`(`BottomSheet.CTA`, 2개면 `BottomSheet.DoubleCTA`). children에 넣은 제목·버튼은 인셋 없이 시트 가장자리에 붙는다(tds-essential '자주 틀리는 API').
 
 ---
 
@@ -118,43 +124,52 @@ export function StatusPanel({ items }: StatusPanelProps) {
 **언제**: 사용자가 옵션 N개 중 하나를 골라야 할 때. AlertDialog 대신 useDialog 사용 (declarative).
 
 ```tsx
-import { useDialog, Checkbox, Paragraph, Spacing } from '@toss/tds-mobile';
+import { useDialog, Checkbox, ListRow } from '@toss/tds-mobile';
 import { useState } from 'react';
 
 interface Option { value: string; label: string }
+
+// 다이얼로그 본문은 여는 순간의 ReactNode라 바깥 state가 바뀌어도 다시 그려지지 않는다 —
+// 선택 표시는 본문 컴포넌트가 자기 state로 갖고, 고른 값은 onPick으로 알린다.
+function OptionList({ options, initial, onPick }: { options: Option[]; initial: string; onPick: (v: string) => void }) {
+  const [value, setValue] = useState(initial);
+  const pick = (v: string) => { setValue(v); onPick(v); };
+  return (
+    <div role="radiogroup">
+      {options.map((opt) => (
+        <ListRow
+          key={opt.value}
+          onClick={() => pick(opt.value)}
+          left={<Checkbox.Circle checked={value === opt.value} onChange={() => pick(opt.value)} aria-label={opt.label} />}
+          contents={<ListRow.Texts type="1RowTypeA" top={opt.label} />}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function useOptionPicker(options: Option[], initial: string) {
   const dialog = useDialog();
   const [selected, setSelected] = useState(initial);
 
   const open = async () => {
+    let picked = selected;
     const ok = await dialog.openConfirm({
       title: '옵션을 선택해주세요',
-      description: (
-        <div>
-          {options.map((opt) => (
-            <Checkbox.Circle
-              key={opt.value}
-              inputType="radio"
-              checked={selected === opt.value}
-              onChange={() => setSelected(opt.value)}
-            >
-              {opt.label}
-            </Checkbox.Circle>
-          ))}
-        </div>
-      ),
+      description: <OptionList options={options} initial={selected} onPick={(v) => { picked = v; }} />,
       confirmButton: '확인',
-      cancelButton: '취소',
+      cancelButton: '닫기',
     });
-    return ok ? selected : null;
+    if (!ok) return null;
+    setSelected(picked);
+    return picked;
   };
 
   return { open, selected };
 }
 ```
 
-**핵심**: `Checkbox.Circle` + `inputType="radio"` (실제 검증됨), `useDialog().openConfirm()` boolean 반환.
+**핵심**: 단일 선택은 `Checkbox.Circle`의 `checked`를 state로 하나만 켜서 표현한다 — `inputType="radio"`는 .d.ts에 "radio는 아직 지원하지 않습니다"라고 적혀 있으니 쓰지 마라. 선택 상태는 본문 컴포넌트가 갖는다(다이얼로그 본문은 다시 그려지지 않는다). `useDialog().openConfirm()`은 boolean 반환.
 
 ---
 
@@ -218,25 +233,35 @@ export function InteractiveGrid({ items, cols, onTap }: InteractiveGridProps) {
 **언제**: 페이지 1차 액션을 화면 하단에 고정 노출. 폼 제출, 결제, 다음 단계 진행 등.
 
 ```tsx
-import { FixedBottomCTA } from '@toss/tds-mobile';
+import { FixedBottomCTA, Paragraph } from '@toss/tds-mobile';
+import type { ReactNode } from 'react';
 
 interface SubmitFooterProps {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** 비활성 이유 한 줄 — CTA 바로 위(topAccessory)에 그린다 */
+  hint?: ReactNode;
 }
 
-export function SubmitFooter({ label, onClick, disabled }: SubmitFooterProps) {
+export function SubmitFooter({ label, onClick, disabled, hint }: SubmitFooterProps) {
   // FixedBottomCTA는 그 자체가 <button> — 안에 Button을 또 넣으면 button>button(무효 HTML).
   return (
-    <FixedBottomCTA onClick={onClick} disabled={disabled}>
+    <FixedBottomCTA
+      onClick={onClick}
+      disabled={disabled}
+      topAccessory={hint ? <Paragraph.Text typography="t7" color="var(--adaptiveGrey600)">{hint}</Paragraph.Text> : undefined}
+    >
       {label}
     </FixedBottomCTA>
   );
 }
+
+// 사용: 비활성이면 이유를 말한다
+<SubmitFooter label="다음" onClick={next} disabled={!valid} hint={valid ? undefined : '금액을 입력하면 다음으로 갈 수 있어요'} />
 ```
 
-**핵심**: `FixedBottomCTA`는 **그 자체가 `<button>`**(.d.ts: `HTMLButtonElement` ref, safe-area+그라데이션 자동) — 안에 `<Button>`을 또 넣으면 `<button><button>`(무효 HTML). children에 라벨을 직접. 2개 버튼은 `FixedBottomCTA.Double` 또는 Pattern 8.
+**핵심**: `FixedBottomCTA`는 **그 자체가 `<button>`**(.d.ts: `HTMLButtonElement` ref, safe-area+그라데이션 자동) — 안에 `<Button>`을 또 넣으면 `<button><button>`(무효 HTML). children에 라벨을 직접. 2개 버튼은 `FixedBottomCTA.Double` 또는 Pattern 8. **비활성 1차 CTA는 이유 한 줄**(`hint` → `topAccessory`) — 이유 없이 회색 버튼만 두면 사용자는 막힌 이유를 모른다. 앱에서는 이 구현을 복제하지 말고 템플릿 `src/components/BottomCTA`의 `SubmitFooter`를 import하라.
 
 ---
 
@@ -352,8 +377,8 @@ TDS `FixedBottomCTA`/`BottomCTA`/`CTAButton`은 **그 자체가 `<button>`**이�
 ```tsx
 // ❌ button > button (무효)
 <FixedBottomCTA><Button variant="fill">저장</Button></FixedBottomCTA>
-// ✅ FixedBottomCTA가 버튼이다 — children에 라벨 직접 (= SubmitFooter)
-<FixedBottomCTA onClick={onSave} disabled={!valid}>저장</FixedBottomCTA>
+// ✅ FixedBottomCTA가 버튼이다 — children에 라벨 직접 (= SubmitFooter). 비활성 이유는 topAccessory 한 줄
+<FixedBottomCTA onClick={onSave} disabled={!valid} topAccessory={valid ? undefined : <Paragraph.Text typography="t7" color="var(--adaptiveGrey600)">이름을 입력하면 저장할 수 있어요</Paragraph.Text>}>저장</FixedBottomCTA>
 // ✅ 2개 버튼 → FixedBottomCTA.Double 또는 커스텀 div+Button (Pattern 8 = ButtonStack)
 ```
 
@@ -427,6 +452,61 @@ import { Paragraph, Spacing } from "@toss/tds-mobile";
 
 ---
 
+## Pattern 12 — 입력 폼 InputForm (칩 선택 + 칸 2개 이상)
+
+**언제**: 기록 추가·계산기 입력처럼 사용자가 여러 값을 넣고 제출하는 화면. 여러 앱에서 반복된 실수 넷(빈 칸에서 라벨이 사라짐 · 칩을 그룹 컴포넌트로 하나씩 그림 · 이유 없는 회색 버튼 · 첫 화면부터 빨간 에러)을 한 번에 피하는 골격.
+
+```tsx
+import { useState } from "react";
+import { Chip, ChipItem, Spacing, TextField } from "@toss/tds-mobile";
+import { SubmitFooter } from "../components/BottomCTA";
+
+const CATEGORIES = ["식비", "교통", "쇼핑"];
+
+export function ExpenseForm({ onSubmit }: { onSubmit: (v: { category: string; amount: number; memo: string }) => void }) {
+  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [touched, setTouched] = useState(false);
+  const valid = Number(amount) > 0;
+  return (
+    <>
+      {/* Chip=그룹, 칩 하나=ChipItem. 선택 상태가 없는 칩 묶음이면 kind="action" */}
+      <Chip kind="select" wrap>
+        {CATEGORIES.map((c) => (
+          <ChipItem key={c} selected={category === c} onClick={() => setCategory(c)}>{c}</ChipItem>
+        ))}
+      </Chip>
+      <Spacing size={16} />
+      {/* 칸이 2개 이상 — 라벨을 항상 보이게(labelOption="sustain"), placeholder는 예시값 */}
+      <TextField
+        variant="box"
+        label="금액"
+        labelOption="sustain"
+        placeholder="예: 12,000"
+        inputMode="numeric"
+        value={amount}
+        onChange={(e) => { setAmount(e.target.value); setTouched(true); }}
+        hasError={touched && !valid}
+        help={touched && !valid ? "금액을 입력해 주세요" : undefined}
+      />
+      <Spacing size={12} />
+      <TextField variant="box" label="메모" labelOption="sustain" placeholder="예: 점심" value={memo} onChange={(e) => setMemo(e.target.value)} />
+      <SubmitFooter
+        label="저장"
+        onClick={() => onSubmit({ category, amount: Number(amount), memo })}
+        disabled={!valid}
+        hint={valid ? undefined : "금액을 입력하면 저장할 수 있어요"}
+      />
+    </>
+  );
+}
+```
+
+**핵심**: `labelOption="sustain"`(기본 `appear`는 빈 칸에서 라벨을 숨긴다) · `hasError`는 **입력을 건드린 뒤에만**(첫 화면부터 빨간 칸 금지) · 비활성 CTA는 `hint`로 이유 한 줄 · 칩은 `Chip`(그룹) 안의 `ChipItem`.
+
+---
+
 ## 패턴 적용 가이드
 
 1. **새 페이지 생성 시**: Pattern 1(PageShell) + Pattern 2(Top) + Pattern 6/8(하단 CTA) 조합이 골든.
@@ -437,6 +517,7 @@ import { Paragraph, Spacing } from "@toss/tds-mobile";
 6. **빈/로딩 상태**: Pattern 10 (StateView — 맨텍스트 금지)
 7. **하단 탭 네비**: `FloatingTabBar`(`src/components`) — 'TDS TabBar'는 없음, 활성탭=컬러 틴트
 8. **데이터/결과 풍부함(조건부)**: Pattern 11 (CountUp 히어로 / Sparkline 추이 / MiniBar 비율 — 단순 유틸리티엔 생략)
+9. **입력 폼**: Pattern 12 (Chip+ChipItem 선택 · TextField `labelOption="sustain"` · 건드린 뒤에만 hasError · SubmitFooter `hint`)
 
 ## 다루지 않은 영역
 
@@ -479,12 +560,15 @@ export default function Result() {
       />
       <Spacing size={16} />
       {/* 핵심 정보는 raw div가 아니라 Card로 묶어 위계를 만든다 */}
+      {/* Paragraph.Text·Amount는 둘 다 인라인 — 사이에 Spacing이 없으면 "눈덩이 전략1,480,861원"처럼 한 줄로 붙는다 */}
       <Card style={{ marginBottom: 12 }} testId="strategy-card">
         <Paragraph.Text typography="st11">눈덩이 전략</Paragraph.Text>
+        <Spacing size={4} />
         <Amount value={1480861} unit="원" typography="t3" />
       </Card>
       <Card testId="strategy-card">
         <Paragraph.Text typography="st11">원리금 전략</Paragraph.Text>
+        <Spacing size={4} />
         <Amount value={1740861} unit="원" typography="t3" />
       </Card>
     </ScreenScaffold>
@@ -492,4 +576,4 @@ export default function Result() {
 }
 ```
 
-핵심: 골격=ScreenScaffold, 1차 액션=SubmitFooter(전체폭 자동), 핵심 숫자=SummaryHero(앵커)+Amount(줄바꿈 방지), 핵심 정보=Card(위계). raw div + 맨 Paragraph 나열 금지.
+핵심: 골격=ScreenScaffold, 1차 액션=SubmitFooter(전체폭 자동), 핵심 숫자=SummaryHero(앵커)+Amount(줄바꿈 방지), 핵심 정보=Card(위계) — Card 안의 라벨·값은 `Spacing`으로 세로로 쌓는다(인라인끼리는 한 줄로 붙는다). raw div + 맨 Paragraph 나열 금지.
