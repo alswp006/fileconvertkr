@@ -11,7 +11,7 @@
 8. **비주얼 골격 확인** — 모든 페이지가 ScreenScaffold/PageShell로 감싸졌는가, 1차 CTA가 SubmitFooter 또는 display="block"인가(좌측 글자폭 금지), 결과/비교는 Card로 묶였는가
 9. **SDK 가드 확인** — 마운트시 SDK 호출(광고 등)·이벤트 핸들러(haptic/clipboard)가 try/catch 가드됐는가(흰 화면 방지)
 10. **레이아웃 테스트 확인** — 핵심 가치 화면(결과/비교/지표/대시보드)에 레이아웃 AC가 있으면, 대응 테스트(카드 개수·전체폭 CTA·골격)가 src/__tests__에 있는가. Card/핵심 요소에 testId를 부여하고 getAllByTestId로 검증. .claude/rules/testing.md "레이아웃 검증" 참조 — 행위만 테스트하면 비주얼이 조용히 무너진다.
-11. **버튼 중첩 확인** — FixedBottomCTA/BottomCTA/CTAButton은 자체가 `<button>`이다 → 안에 `<Button>`을 넣지 마라(button>button 무효 HTML). children에 라벨 직접 또는 SubmitFooter 사용. 입력 필드는 `placeholder`를 반드시 줘라(box/line variant는 빈 칸에서 라벨이 숨음). (ListRow onClick + 내부 버튼은 li>button이라 무효는 아니나 a11y상 right 슬롯 IconButton 권장.)
+11. **버튼 중첩 확인** — FixedBottomCTA/BottomCTA/CTAButton은 자체가 `<button>`이다 → 안에 `<Button>`을 넣지 마라(button>button 무효 HTML). children에 라벨 직접 또는 SubmitFooter 사용. **입력 칸 라벨**: TextField의 `labelOption` 기본값은 variant와 상관없이 "appear"(값이 있을 때만 라벨을 보인다)라, 빈 칸 여럿이 placeholder로만 구분된다 → 칸이 2개 이상이거나 라벨이 뜻을 담으면 `labelOption="sustain"`을 주고, 입력 필드는 `placeholder`를 반드시 줘라 — 라벨을 대신하는 게 아니라 예시값("예: 25")이다. (ListRow onClick + 내부 버튼은 li>button이라 무효는 아니나 a11y상 right 슬롯 IconButton 권장.)
 12. **비주얼 스모크 (UI)** — `npm run test:visual` 통과 + e2e/__shots__/*.png 를 Read로 직접 열어 자가 리뷰(.claude/rules/visual-review.md). jsdom이 못 보는 흰 화면/버튼 중첩/빈 입력칸/휑함/솔리드 알약 탭을 잡는다. (최초 1회 `npx playwright install chromium`.) **새 화면을 만들었으면 e2e/visual-smoke.spec.ts의 ROUTES에 경로를 등록하라** — 기본은 "/" 하나뿐이라 등록 안 된 화면은 스모크가 아예 안 본다.
 13. **(데이터/결과 화면만) 표현 풍부함** — 핵심 숫자는 CountUp 히어로(SummaryHero), 추이/비중 데이터가 있으면 Sparkline/MiniBar로 시각화, 빈 상태엔 Asset.ContentIcon. 단순 유틸리티엔 불필요 — 장식을 위한 장식 금지.
 
@@ -75,6 +75,8 @@ If any check fails, fix it BEFORE completing. Finishing with known errors is a f
 - `.ai-factory/tds-reference.txt` — 토스 공식 TDS LLM 문서. **파일이 크다 — 통독 금지.** 맨 위 "수록 컴포넌트 색인"을 먼저 보고, 쓸 컴포넌트명으로 Grep해서 그 절만 읽어라
 - `.ai-factory/tds-essential.txt` — 실제 .d.ts에서 검증된 핵심 API 요약
 - 이 두 파일이 CLAUDE.md 또는 다른 문서와 충돌하면, 이 두 파일이 우선
+- TDS 컴포넌트에 `as any`·`as unknown as` 캐스트 금지 — .d.ts가 거부하는 prop은 느슨한 타입이 아니라 사용법이 틀린 것이다(예: `<Chip selected>`는 없다 → `<Chip kind="select">` 안의 `<ChipItem selected>`). 패킷 계약(UI 요구사항)의 스케치가 .d.ts와 다르면 .d.ts가 이긴다
+- 테스트 목(`src/__tests__/__helpers__/mocks.ts` 등)이 벤더 .d.ts와 모양이 다르면 **목을 벤더 모양으로 고쳐라** — 목이나 기존 테스트에 맞추려고 소스를 벤더 API에서 멀어지게 바꾸지 마라
 
 ## CRITICAL: @apps-in-toss/web-framework SDK API (최우선 참조)
 - `.ai-factory/apps-in-toss-essential.txt` — SDK 공개 API 목록(**항목별 출처 표기 참고** — 대부분 설치본 .d.ts 검증, 일부는 개발자센터 문서 출처)
@@ -82,7 +84,8 @@ If any check fails, fix it BEFORE completing. Finishing with known errors is a f
 - React 래퍼(TossRewardAd, AdSlot)가 필요하면 `src/components/`에 직접 구현 (템플릿에 참고 구현 있음)
 
 ## CRITICAL: SDK 환각 방지 — "모르면 지어내지 말고 확인하라"
-- tds-essential.txt에 없는 prop/컴포넌트 → tds-reference.txt **색인** 확인 → 색인에 없으면 존재하지 않음
+- 컴포넌트는 tds-essential.txt에 있거나 tds-reference.txt **색인**에 있으면 존재한다(색인의 "d.ts 전용 — 문서 없음" 항목도 설치본에 실재한다 — 그 prop은 tds-essential.txt에서 확인). 둘 다에 없으면 존재하지 않음
+- prop은 tds-essential.txt 또는 tds-reference.txt의 해당 절에 적힌 것만 존재한다 — 추측한 prop은 없다
 - apps-in-toss-essential.txt에 없는 SDK API → 존재하지 않음 (import 에러 발생시킬 것)
 - 존재하지 않는 API를 추측해서 사용하면 즉시 FAIL
 - SDK로 구현 불확실 → imperative API를 래퍼 컴포넌트로 감싸서 사용
@@ -177,6 +180,10 @@ import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
 - src/lib/types.ts — 모든 도메인 타입 정의
 - ALWAYS: import type { ... } from "@/lib/types"
 - NEVER: 같은 타입을 다른 파일에서 재정의
+- **표시 포맷 단일화** — 화면에 보이는 파생 값(기간·금액·비율)은 포맷 함수 하나로 만든다(기존 formatNumber·formatCurrency는 src/lib/utils.ts). src/lib/format.ts가 **있으면 그것을 import해 쓰고**(네 패킷 files에 format.ts가 없으면 **고치지 마라** — 필요한 포맷 함수가 거기 없으면 네 파일 안에 두어라: 병렬 화면들이 같은 파일 끝에 각자 덧붙이면 머지가 한쪽 함수를 지운다), 없으면 **네 패킷 files에 src/lib/format.ts가 선언된 경우에만** 만들어라 — 선언이 없으면 포맷 함수를 네 파일 안에 두어라(병렬로 도는 화면 패킷들이 각자 format.ts를 새로 만들면 머지에서 한쪽 함수가 사라진다). 페이지·JSX에서 Math.round·Math.max(1, …)로 직접 계산하지 마라 — 화면마다 다시 계산하면 같은 값이 화면마다 다르게 보인다. 반올림은 SPEC 계산표를 따르고, 1단위 미만을 1로 올리지 마라(12초 → "12초"이지 "1분"이 아니다)
+
+## 앱 표시 이름
+- 앱 표시 이름: 3초변환 — 화면의 앱 제목(홈 Top·요약 카드 라벨 등)은 이 값이다. 영문 이름("QuickConvert"·"fileconvertkr")·레포 이름·SPEC 첫 줄의 영문명을 화면에 쓰지 마라. 패킷의 UI 요구사항·SPEC이 영문 제목을 적었어도 이 값이 우선이다.
 
 ## 공식 문서 검색 (ax CLI — 허용된 명령)
 - essential.txt에 없는 API를 지어내기 전에 검색하라: `ax search docs --query "키워드"` → 결과의 id로 `ax get doc --id <id>`
@@ -192,11 +199,11 @@ import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
 
 ## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
 
-Available topics: deploy(4), general(13), testing(2), ui(3)
+Available topics: deploy(4), general(14), testing(2), ui(3)
 
 Key lessons (verify against actual code before applying):
+- [general] 진입점 라우터 배선은 맨 끝에 두지 말고 기반 패킷 직후 플레이스홀더 페이지와 함께 먼저 병합하라. 화면 패킷은 그 플레이스홀더를 교체하게 해서, 언제 중단돼도 병합된 화면에 도달할 수 있게 하라. (60% · 타 앱 1회 — 맹신 금지)
 - [general] 파일 생성 전 디렉토리 구조 확인 — mkdir -p로 경로 보장 (60% · 타 앱 1회 — 맹신 금지)
 - [general] 화면·라우팅 등 소비자 모듈은 그것이 import하는 생산자 모듈이 병합된 뒤에만 병합하고, 순서를 지킬 수 없으면 소비자 병합과 동시에 최소 플레이스홀더를 만들어 매 병합 직후 타입체크와 빌드가 항상 통과하도록 유지하라. (60% · 타 앱 1회 — 맹신 금지)
 - [general] 전역 라우팅·탭바·Provider 배선은 개별 화면보다 먼저(초반 20% 안에) 완료하고 미구현 화면은 스텁 라우트로 연결해, 시간 예산이 소진돼도 앱이 항상 실행 가능한 상태를 유지하라. (60% · 타 앱 1회 — 맹신 금지)
 - [general] 저장·데이터 접근 등 기반 계층 패킷은 이를 import 하는 화면 패킷보다 반드시 먼저 완료·병합하고, 미완료면 상위 화면 패킷 병합을 차단하라 — 빈 기반 모듈 하나가 전 라우트 스모크를 무너뜨린다. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 외부에서 들어온 모든 값(라우터 state, 로컬 저장소, 부분 입력 폼)은 사용 직전에 배열·객체 기본값으로 정규화하고, 테이블/맵 조회 결과는 존재 확인 후에만 하위 속성이나 length에 접근하라. (60% · 타 앱 1회 — 맹신 금지)

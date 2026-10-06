@@ -25,7 +25,23 @@ export default function Home() {
       /* WebView 밖에서는 throw — 무시 */
     }
     logClick(`tool_select_${tool}`);
-    navigate(toolMeta[tool].route);
+    switch (tool) {
+      case 'heic':
+        navigate('/convert/heic');
+        break;
+      case 'compress':
+        navigate('/convert/compress');
+        break;
+      case 'pdf-merge':
+        navigate('/pdf/merge');
+        break;
+      case 'pdf-to-image':
+        navigate('/pdf/to-image');
+        break;
+      case 'pdf-split':
+        navigate('/pdf/split');
+        break;
+    }
   };
 
   return (
