@@ -106,7 +106,7 @@ export default function Compress() {
         />
       }
     >
-      <Paragraph.Text typography="st11">목표 용량 이하로 사진을 줄여요</Paragraph.Text>
+      <Paragraph.Text typography="t6">목표 용량 이하로 사진을 줄여요</Paragraph.Text>
       <Spacing size={16} />
       <TargetSizeSelector value={targetKB} onChange={handleTarget} />
       <Spacing size={16} />
@@ -120,14 +120,14 @@ export default function Compress() {
       <Spacing size={16} />
       {isCompressing && progress && (
         <>
-          <Paragraph.Text typography="st11">
+          <Paragraph.Text typography="t6">
             {progress.done}/{progress.total} 압축 중
           </Paragraph.Text>
           <Spacing size={8} />
         </>
       )}
       {files.length === 0 ? (
-        <Paragraph.Text typography="st11" color="var(--adaptiveGrey600)">
+        <Paragraph.Text typography="t6" color="var(--adaptiveGrey600)">
           줄일 사진을 선택해주세요
         </Paragraph.Text>
       ) : (

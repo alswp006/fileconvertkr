@@ -11,6 +11,7 @@ export function ExpiredView() {
   const navigate = useNavigate();
 
   return (
+    <div style={{ minHeight: "60dvh", display: "flex", flexDirection: "column", justifyContent: "center" }}>
     <EmptyState
       icon={<IconBadge size={56}><AlertCircle size={28} /></IconBadge>}
       title="변환 결과가 만료됐어요"
@@ -20,5 +21,6 @@ export function ExpiredView() {
         </Button>
       }
     />
+    </div>
   );
 }

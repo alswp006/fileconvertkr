@@ -1,5 +1,5 @@
 import { Top, Paragraph, Spacing, ListRow } from '@toss/tds-mobile';
-import { Image, Minimize2, Files, FileImage, Scissors } from 'lucide-react';
+import { Image, Minimize2, Files, FileImage, Scissors, LayoutGrid, Clock } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { IconBadge } from '../components/IconBadge';
 import { useNavigate } from 'react-router-dom';
@@ -53,13 +53,12 @@ export default function Home() {
       bottom={
         <FloatingTabBar
           items={[
-            { label: '변환', path: '/' },
-            { label: '이력', path: '/history' },
+            { label: '변환', path: '/', icon: <LayoutGrid size={22} /> },
+            { label: '이력', path: '/history', icon: <Clock size={22} /> },
           ]}
         />
       }
     >
-      <Spacing size={8} />
       <Paragraph.Text typography="t6" color="var(--adaptiveGrey700)">
         파일은 기기 안에서만 변환돼요. 서버로 올라가지 않아요.
       </Paragraph.Text>

@@ -130,7 +130,7 @@ export default function PdfToImage() {
         />
       }
     >
-      <Paragraph.Text typography="st11">페이지를 사진으로 저장해요</Paragraph.Text>
+      <Paragraph.Text typography="t6">페이지를 사진으로 저장해요</Paragraph.Text>
       <Spacing size={16} />
       <PdfSingleFilePicker
         tool="pdf-to-image"
@@ -140,9 +140,9 @@ export default function PdfToImage() {
         disabled={isConverting || checking}
       />
       <Spacing size={16} />
-      {checking && <Paragraph.Text typography="st11">PDF 확인 중</Paragraph.Text>}
+      {checking && <Paragraph.Text typography="t6">PDF 확인 중</Paragraph.Text>}
       {!file && !checking && (
-        <Paragraph.Text typography="st11" color="grey600">
+        <Paragraph.Text typography="t6" color="grey600">
           이미지로 바꿀 PDF를 선택해주세요
         </Paragraph.Text>
       )}
@@ -233,7 +233,7 @@ export default function PdfToImage() {
       {progress && (
         <>
           <Spacing size={16} />
-          <Paragraph.Text typography="st11">
+          <Paragraph.Text typography="t6">
             {progress.done}/{progress.total} 페이지 변환 중
           </Paragraph.Text>
         </>

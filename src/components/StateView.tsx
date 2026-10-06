@@ -45,7 +45,7 @@ export function EmptyState({
       ) : null}
       {action ? (
         <>
-          <Spacing size={20} />
+          <Spacing size={24} />
           {action}
         </>
       ) : null}

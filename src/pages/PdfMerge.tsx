@@ -153,12 +153,12 @@ export default function PdfMerge() {
         />
       }
     >
-      <Paragraph.Text typography="st11">위에 있는 파일부터 순서대로 합쳐요</Paragraph.Text>
+      <Paragraph.Text typography="t6">위에 있는 파일부터 순서대로 합쳐요</Paragraph.Text>
       <Spacing size={16} />
       <FilePickSection tool="pdf-merge" selected={files} onAdd={(f) => void handleAdd(f)} label="PDF 선택" disabled={isMerging} />
       <Spacing size={16} />
       {files.length === 0 ? (
-        <Paragraph.Text typography="st11" color="grey600">
+        <Paragraph.Text typography="t6" color="grey600">
           합칠 PDF 파일을 2개 이상 선택해주세요
         </Paragraph.Text>
       ) : (
@@ -172,7 +172,7 @@ export default function PdfMerge() {
             disabled={isMerging}
           />
           {files.length === 1 && (
-            <Paragraph.Text typography="st11" color="grey600">
+            <Paragraph.Text typography="t6" color="grey600">
               2개 이상 선택해주세요
             </Paragraph.Text>
           )}

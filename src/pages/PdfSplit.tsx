@@ -129,7 +129,7 @@ export default function PdfSplit() {
         />
       }
     >
-      <Paragraph.Text typography="st11">페이지별·범위별로 PDF를 나눠요</Paragraph.Text>
+      <Paragraph.Text typography="t6">페이지별·범위별로 PDF를 나눠요</Paragraph.Text>
       <Spacing size={16} />
       <PdfSingleFilePicker
         tool="pdf-split"
@@ -139,9 +139,9 @@ export default function PdfSplit() {
         disabled={isSplitting || checking}
       />
       <Spacing size={16} />
-      {checking && <Paragraph.Text typography="st11">PDF 확인 중</Paragraph.Text>}
+      {checking && <Paragraph.Text typography="t6">PDF 확인 중</Paragraph.Text>}
       {!file && !checking && (
-        <Paragraph.Text typography="st11" color="grey600">
+        <Paragraph.Text typography="t6" color="grey600">
           나눌 PDF를 선택해주세요
         </Paragraph.Text>
       )}
@@ -184,7 +184,7 @@ export default function PdfSplit() {
           {groups.length > 0 && !helpText && (
             <>
               <Spacing size={12} />
-              <Paragraph.Text typography="st11">{groups.length}개 파일로 나눠요</Paragraph.Text>
+              <Paragraph.Text typography="t6">{groups.length}개 파일로 나눠요</Paragraph.Text>
             </>
           )}
         </>
@@ -192,7 +192,7 @@ export default function PdfSplit() {
       {progress && (
         <>
           <Spacing size={16} />
-          <Paragraph.Text typography="st11">
+          <Paragraph.Text typography="t6">
             {progress.done}/{progress.total} 파일 만드는 중
           </Paragraph.Text>
         </>

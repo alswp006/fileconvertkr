@@ -103,7 +103,7 @@ export default function Heic() {
         />
       }
     >
-      <Paragraph.Text typography="st11">아이폰 사진을 카톡·이메일에서 열리는 형식으로 바꿔요</Paragraph.Text>
+      <Paragraph.Text typography="t6">아이폰 사진을 카톡·이메일에서 열리는 형식으로 바꿔요</Paragraph.Text>
       <Spacing size={16} />
       <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
         <ChipItem selected={format === "jpg"} disabled={isConverting} onClick={() => handleFormat("jpg")}>
@@ -124,14 +124,14 @@ export default function Heic() {
       <Spacing size={16} />
       {isConverting && progress && (
         <>
-          <Paragraph.Text typography="st11">
+          <Paragraph.Text typography="t6">
             {progress.done}/{progress.total} 변환 중
           </Paragraph.Text>
           <Spacing size={8} />
         </>
       )}
       {files.length === 0 ? (
-        <Paragraph.Text typography="st11" color="var(--adaptiveGrey600)">
+        <Paragraph.Text typography="t6" color="var(--adaptiveGrey600)">
           변환할 HEIC 사진을 선택해주세요
         </Paragraph.Text>
       ) : (

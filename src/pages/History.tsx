@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertDialog, Button, Paragraph, Spacing, Top } from "@toss/tds-mobile";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, LayoutGrid, Clock } from "lucide-react";
 import { IconBadge } from "@/components/IconBadge";
 import { generateHapticFeedback } from "@apps-in-toss/web-framework";
 import { ScreenScaffold } from "@/components/ScreenScaffold";
@@ -24,8 +24,8 @@ function haptic(type: "tickWeak" | "success") {
 }
 
 const TAB_ITEMS = [
-  { label: "홈", path: "/" },
-  { label: "이력", path: "/history" },
+  { label: "변환", path: "/", icon: <LayoutGrid size={22} /> },
+  { label: "이력", path: "/history", icon: <Clock size={22} /> },
 ];
 
 export default function History() {
