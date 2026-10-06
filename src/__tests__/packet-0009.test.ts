@@ -272,7 +272,7 @@ describe("결과 화면 무료 층 컴포넌트: FreeTier·ResultSummary·Output
       renderInRouter(React.createElement(ExpiredView, null));
 
       expect(screen.getByText("변환 결과가 만료됐어요")).toBeInTheDocument();
-      expect(document.querySelector("[data-content-icon]")).toBeInTheDocument();
+      expect(document.querySelector("svg")).toBeInTheDocument();
       expect(screen.queryByTestId("free-tier")).not.toBeInTheDocument();
       expect(screen.queryByTestId("locked-teaser")).not.toBeInTheDocument();
 

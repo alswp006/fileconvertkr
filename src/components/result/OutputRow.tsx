@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Asset, Button, ListRow, Toast } from "@toss/tds-mobile";
+import { FileText } from "lucide-react";
+import { IconBadge } from "@/components/IconBadge";
+import { Button, ListRow, Toast } from "@toss/tds-mobile";
 import { generateHapticFeedback } from "@apps-in-toss/web-framework";
 import { deliverFile } from "@/lib/deliverFile";
 import { formatBytes } from "@/lib/utils";
@@ -50,7 +52,7 @@ export function OutputRow({
       : `${formatBytes(output.sourceSizeBytes)} → ${formatBytes(output.sizeBytes)}`;
 
   return (
-    <div data-testid="output-row">
+    <div data-testid="output-row" style={{ margin: "0 -24px" }}>
       <ListRow
         left={
           isImage ? (
@@ -60,7 +62,7 @@ export function OutputRow({
               style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }}
             />
           ) : (
-            <Asset.ContentIcon name="iconFilePdfRegular" alt="PDF" />
+            <IconBadge><FileText size={22} /></IconBadge>
           )
         }
         contents={<ListRow.Texts type="2RowTypeA" top={output.fileName} bottom={bottomText} />}

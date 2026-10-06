@@ -105,14 +105,14 @@ export default function Heic() {
     >
       <Paragraph.Text typography="st11">아이폰 사진을 카톡·이메일에서 열리는 형식으로 바꿔요</Paragraph.Text>
       <Spacing size={16} />
-      <Chip kind="select" wrap>
+      <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
         <ChipItem selected={format === "jpg"} disabled={isConverting} onClick={() => handleFormat("jpg")}>
           JPG
         </ChipItem>
         <ChipItem selected={format === "png"} disabled={isConverting} onClick={() => handleFormat("png")}>
           PNG
         </ChipItem>
-      </Chip>
+      </Chip></div>
       <Spacing size={16} />
       <FilePickSection
         tool="heic"

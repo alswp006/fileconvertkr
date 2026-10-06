@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { PageShell } from "./PageShell";
 
 /**
- * 골든 화면 골격 — PageShell + (선택)헤더 슬롯 + 본문(좌우 16px 패딩) + (선택)하단 CTA 슬롯.
+ * 골든 화면 골격 — PageShell + (선택)헤더 슬롯 + 본문(좌우 24px 패딩 — Top 제목과 정렬) + (선택)하단 CTA 슬롯.
  *
  * Pre-built (재구현 금지): 새 페이지는 이 골격으로 시작하라.
  *   <ScreenScaffold
@@ -26,7 +26,7 @@ export function ScreenScaffold({
   return (
     <PageShell style={top ? { paddingTop: 0 } : undefined}>
       {top}
-      <div style={{ padding: "16px 16px 0" }}>{children}</div>
+      <div style={{ padding: "16px 24px 0" }}>{children}</div>
       {bottom}
     </PageShell>
   );

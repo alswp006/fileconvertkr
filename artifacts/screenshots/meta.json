@@ -16,8 +16,8 @@
       "orientation": "portrait"
     },
     {
-      "file": "03-portrait-convert.png",
-      "route": "/convert",
+      "file": "03-portrait-convert-heic.png",
+      "route": "/convert/heic",
       "width": 636,
       "height": 1048,
       "orientation": "portrait"

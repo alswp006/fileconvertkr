@@ -1,4 +1,7 @@
-import { Top, Paragraph, Spacing, ListRow, Asset } from '@toss/tds-mobile';
+import { Top, Paragraph, Spacing, ListRow } from '@toss/tds-mobile';
+import { Image, Minimize2, Files, FileImage, Scissors } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { IconBadge } from '../components/IconBadge';
 import { useNavigate } from 'react-router-dom';
 import { generateHapticFeedback } from '@apps-in-toss/web-framework';
 import { ScreenScaffold } from '../components/ScreenScaffold';
@@ -7,12 +10,12 @@ import { logClick } from '../lib/analytics';
 import { toolMeta, TOOL_ORDER } from '../lib/toolMeta';
 import type { ToolType } from '../lib/types';
 
-const TOOL_ICON: Record<ToolType, string> = {
-  heic: 'iconImageRegular',
-  compress: 'iconCompressRegular',
-  'pdf-merge': 'iconDocsRegular',
-  'pdf-to-image': 'iconPhotoRegular',
-  'pdf-split': 'iconCutRegular',
+const TOOL_ICON: Record<ToolType, ReactNode> = {
+  heic: <Image size={22} />,
+  compress: <Minimize2 size={22} />,
+  'pdf-merge': <Files size={22} />,
+  'pdf-to-image': <FileImage size={22} />,
+  'pdf-split': <Scissors size={22} />,
 };
 
 export default function Home() {
@@ -62,11 +65,12 @@ export default function Home() {
       </Paragraph.Text>
       <Spacing size={16} />
 
+      <div style={{ margin: '0 -24px' }}>
       {TOOL_ORDER.map((tool) => (
         <ListRow
           key={tool}
           onClick={() => selectTool(tool)}
-          left={<Asset.ContentIcon name={TOOL_ICON[tool]} alt={toolMeta[tool].title} />}
+          left={<IconBadge>{TOOL_ICON[tool]}</IconBadge>}
           contents={
             <ListRow.Texts
               type="2RowTypeA"
@@ -76,6 +80,7 @@ export default function Home() {
           }
         />
       ))}
+      </div>
 
       <Spacing size={80} />
     </ScreenScaffold>

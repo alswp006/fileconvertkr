@@ -155,7 +155,7 @@ export default function PdfToImage() {
           <Spacing size={24} />
           <Paragraph.Text typography="t5">형식</Paragraph.Text>
           <Spacing size={12} />
-          <Chip kind="select" wrap>
+          <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
             <ChipItem
               selected={format === "jpg"}
               onClick={() => {
@@ -174,11 +174,11 @@ export default function PdfToImage() {
             >
               PNG
             </ChipItem>
-          </Chip>
+          </Chip></div>
           <Spacing size={24} />
           <Paragraph.Text typography="t5">화질</Paragraph.Text>
           <Spacing size={12} />
-          <Chip kind="select" wrap>
+          <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
             <ChipItem
               selected={scale === 1.5}
               onClick={() => {
@@ -197,18 +197,18 @@ export default function PdfToImage() {
             >
               고화질
             </ChipItem>
-          </Chip>
+          </Chip></div>
           <Spacing size={24} />
           <Paragraph.Text typography="t5">페이지</Paragraph.Text>
           <Spacing size={12} />
-          <Chip kind="select" wrap>
+          <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
             <ChipItem selected={mode === "all"} onClick={() => setMode("all")}>
               전체
             </ChipItem>
             <ChipItem selected={mode === "range"} onClick={() => setMode("range")}>
               범위 지정
             </ChipItem>
-          </Chip>
+          </Chip></div>
           <Spacing size={12} />
           {mode === "range" && (
             <KeyboardAwareTextField

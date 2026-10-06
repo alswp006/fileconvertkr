@@ -26,7 +26,7 @@ export default function Result() {
 
   if (!job) {
     return (
-      <ScreenScaffold>
+      <ScreenScaffold top={<Top title={<Top.TitleParagraph>변환 결과</Top.TitleParagraph>} />}>
         <ExpiredView />
       </ScreenScaffold>
     );

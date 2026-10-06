@@ -154,14 +154,14 @@ export default function PdfSplit() {
           <Spacing size={24} />
           <Paragraph.Text typography="t5">나누는 방법</Paragraph.Text>
           <Spacing size={12} />
-          <Chip kind="select" wrap>
+          <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
             <ChipItem selected={mode === "each"} onClick={() => setMode("each")}>
               페이지마다
             </ChipItem>
             <ChipItem selected={mode === "ranges"} onClick={() => setMode("ranges")}>
               범위로
             </ChipItem>
-          </Chip>
+          </Chip></div>
           <Spacing size={12} />
           {mode === "ranges" && (
             <KeyboardAwareTextField

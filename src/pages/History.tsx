@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertDialog, Asset, Button, Paragraph, Spacing, Top } from "@toss/tds-mobile";
+import { AlertDialog, Button, Paragraph, Spacing, Top } from "@toss/tds-mobile";
+import { FolderOpen } from "lucide-react";
+import { IconBadge } from "@/components/IconBadge";
 import { generateHapticFeedback } from "@apps-in-toss/web-framework";
 import { ScreenScaffold } from "@/components/ScreenScaffold";
 import { EmptyState } from "@/components/StateView";
@@ -83,7 +85,7 @@ export default function History() {
     >
       {isEmpty ? (
         <EmptyState
-          icon={<Asset.ContentIcon name="iconFolderRegular" alt="빈 이력" />}
+          icon={<IconBadge size={56}><FolderOpen size={28} /></IconBadge>}
           title="아직 변환한 파일이 없어요"
           action={
             <Button variant="weak" onClick={() => navigate("/")}>

@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { Asset, Button } from "@toss/tds-mobile";
+import { Button } from "@toss/tds-mobile";
+import { AlertCircle } from "lucide-react";
+import { IconBadge } from "@/components/IconBadge";
 import { EmptyState } from "@/components/StateView";
 
 /**
@@ -10,7 +12,7 @@ export function ExpiredView() {
 
   return (
     <EmptyState
-      icon={<Asset.ContentIcon name="iconAlertCircleRegular" alt="만료" />}
+      icon={<IconBadge size={56}><AlertCircle size={28} /></IconBadge>}
       title="변환 결과가 만료됐어요"
       action={
         <Button display="block" onClick={() => navigate("/", { replace: true })}>

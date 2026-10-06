@@ -91,7 +91,7 @@ export function TargetSizeSelector({ value, onChange }: TargetSizeSelectorProps)
     <div>
       <Paragraph.Text typography="t5">목표 용량</Paragraph.Text>
       <Spacing size={12} />
-      <Chip kind="select" wrap>
+      <div style={{ margin: "0 -20px" }}><Chip kind="select" wrap>
         {PRESETS.map((preset) => (
           <ChipItem
             key={preset.kb}
@@ -104,7 +104,7 @@ export function TargetSizeSelector({ value, onChange }: TargetSizeSelectorProps)
         <ChipItem selected={selected === "custom"} onClick={handleCustomClick}>
           직접 입력
         </ChipItem>
-      </Chip>
+      </Chip></div>
       {selected === "custom" && (
         <>
           <Spacing size={12} />
